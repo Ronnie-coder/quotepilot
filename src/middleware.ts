@@ -1,4 +1,4 @@
-import { authMiddleware } from "@clerk/nextjs/server";
+import { authMiddleware } from "@clerk/nextjs";
 
 export default authMiddleware({
   // Mark all routes as protected, except for the ones listed below.
