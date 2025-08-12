@@ -1,14 +1,18 @@
-// /src/middleware.ts
-import { clerkMiddleware } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-export default clerkMiddleware({
-  // By default, all routes are protected.
-  // We explicitly list the routes that should be accessible to everyone (public).
-  publicRoutes: [
-    '/', // Allow the landing page
-    '/sign-in(.*)', // Allow the sign-in pages
-    '/sign-up(.*)', // Allow the sign-up pages
-  ],
+// Define which routes are publicly accessible
+const isPublicRoute = createRouteMatcher([
+  '/', // The landing page
+  '/sign-in(.*)', // The sign-in pages
+  '/sign-up(.*)', // The sign-up pages
+  '/api/(.*)', // Allow any API routes if you have them
+]);
+
+export default clerkMiddleware((auth, req) => {
+  // Protect all routes that are not public
+  if (!isPublicRoute(req)) {
+    auth().protect();
+  }
 });
 
 export const config = {
