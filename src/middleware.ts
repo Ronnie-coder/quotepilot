@@ -1,25 +1,20 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+// /src/middleware.ts
+import { clerkMiddleware } from '@clerk/nextjs/server';
 
-const isPublicRoute = createRouteMatcher([
-  '/', // The landing page is public
-  '/sign-in(.*)', // Sign-in pages are public
-  '/sign-up(.*)', // Sign-up pages are public
-  '/api/(.*)', // Your API routes are public
-]);
-
-export default clerkMiddleware((auth, req) => {
-  // If the route is NOT public, then protect it.
-  // The middleware will automatically handle the redirection.
-  if (!isPublicRoute(req)) {
-    auth().protect();
-  }
+export default clerkMiddleware({
+  // By default, all routes are protected.
+  // We explicitly list the routes that should be accessible to everyone (public).
+  publicRoutes: [
+    '/', // Allow the landing page
+    '/sign-in(.*)', // Allow the sign-in pages
+    '/sign-up(.*)', // Allow the sign-up pages
+  ],
 });
 
 export const config = {
+  // This matcher ensures the middleware runs on all routes except for static files.
   matcher: [
-    // Skip Next.js internal paths (_next) and static files
-    '/((?!_next|static|favicon.ico|.*\\..*).*)',
-    // Run on API routes
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     '/(api|trpc)(.*)',
   ],
 };
