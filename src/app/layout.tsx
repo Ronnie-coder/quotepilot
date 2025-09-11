@@ -1,43 +1,30 @@
-// /src/app/layout.tsx
-'use client';
+// src/app/layout.tsx (FULL REPLACEMENT)
 
-// Import ClerkProvider
 import { ClerkProvider } from '@clerk/nextjs';
+import SupabaseProvider from '@/providers/SupabaseProvider'; // <-- IMPORT: Establish Command Center Link
+import { Providers } from './providers';
+import { Analytics } from '@vercel/analytics/react';
 
-import { ChakraProvider, Box, Flex } from '@chakra-ui/react';
-import theme from '../styles/theme';
-import { Inter } from 'next/font/google';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import { Analytics } from "@vercel/analytics/next"
+export const metadata = {
+  title: 'QuotePilot - Your Business, Streamlined.',
+  description: 'Generate, send, and track professional quotes in seconds.',
+};
 
-const inter = Inter({ subsets: ['latin'] });
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Wrap the entire application with ClerkProvider
     <ClerkProvider>
       <html lang="en">
         <head>
-          <title>QuotePilot</title>
-          <meta name="description" content="Smart Quote and Invoice Generator" />
+          <meta charSet="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
           <link rel="icon" href="/logo.svg" />
         </head>
-        <body className={inter.className}>
-          {/* Our existing ChakraProvider and layout structure remains intact */}
-          <ChakraProvider theme={theme}>
-            <Flex direction="column" minH="100vh">
-              <Navbar />
-              <Box as="main" flex="1" display="flex" flexDirection="column">
-                {children}
-              </Box>
-              <Footer />
-            </Flex>
-          </ChakraProvider>
+        <body>
+          <SupabaseProvider> {/* <-- DEPLOYED: New Auth Pipeline Active */}
+            <Providers>
+              {children}
+            </Providers>
+          </SupabaseProvider>
           <Analytics />
         </body>
       </html>

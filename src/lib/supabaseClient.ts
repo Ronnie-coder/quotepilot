@@ -1,8 +1,22 @@
-import { createClient } from '@supabase/supabase-js'
+// src/lib/supabaseClient.ts
+import { createClient } from "@supabase/supabase-js";
+import { SupabaseClient } from "@supabase/supabase-js";
 
-// Get the Supabase URL and Anon Key from your .env.local file
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+let supabase: SupabaseClient | null = null;
 
-// Create and export the Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const createSupabaseClient = (supabaseToken: string) => {
+  // Re-initialize the client with the new token for every request
+  // This is crucial for client-side operations where the user can change.
+  supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${supabaseToken}`,
+        },
+      },
+    }
+  );
+  return supabase;
+};

@@ -1,21 +1,22 @@
-// /src/components/Navbar.tsx
+// src/components/Navbar.tsx (UPGRADED)
 'use client';
 
-import { Box, Flex, Heading, Button, useColorMode, useColorModeValue, Spacer } from '@chakra-ui/react';
-import { MoonIcon, SunIcon } from '@chakra-ui/icons';
+import { Box, Flex, Heading, Button, useColorMode, useColorModeValue, Spacer, HStack } from '@chakra-ui/react';
+import { MoonIcon, SunIcon, AddIcon } from '@chakra-ui/icons'; // VANGUARD: Import AddIcon
 import Image from 'next/image';
 import NextLink from 'next/link';
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
-
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 const Navbar = () => {
   const { colorMode, toggleColorMode } = useColorMode();
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const textColor = useColorModeValue('gray.800', 'white');
-  const logoRef = useRef<HTMLDivElement>(null);
+
+  const bgColor = useColorModeValue('white', 'transparent');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const textColor = useColorModeValue('gray.800', 'whiteAlpha.900');
   
+  const logoRef = useRef<HTMLDivElement>(null);
   const appName = "QuotePilot";
 
   useEffect(() => {
@@ -32,14 +33,15 @@ const Navbar = () => {
     <Box
       bg={bgColor}
       px={{ base: 4, md: 8 }}
-      shadow="sm"
+      shadow={colorMode === 'light' ? 'sm' : 'none'}
       position="sticky"
       top={0}
       zIndex={10}
+      borderBottomWidth="1px"
+      borderColor={borderColor}
     >
       <Flex h={16} alignItems="center" justifyContent="space-between" maxW="container.xl" mx="auto">
         
-        {/* --- FIX: Updated to modern NextLink syntax --- */}
         <NextLink href="/">
           <Flex alignItems="center" cursor="pointer">
             <Image src="/logo.svg" alt="QuotePilot Logo" width={32} height={32} />
@@ -60,13 +62,11 @@ const Navbar = () => {
 
           <SignedOut>
             <Flex>
-              {/* --- FIX: Updated to modern NextLink syntax --- */}
               <NextLink href="/sign-in">
                 <Button colorScheme="brand" variant="ghost" mr={2}>
                   Log In
                 </Button>
               </NextLink>
-              {/* --- FIX: Updated to modern NextLink syntax --- */}
               <NextLink href="/sign-up">
                 <Button colorScheme="brand" variant="solid">
                   Sign Up
@@ -76,12 +76,27 @@ const Navbar = () => {
           </SignedOut>
           
           <SignedIn>
-            {/* --- FIX: Updated to modern NextLink syntax --- */}
-            <NextLink href="/dashboard">
-                <Button colorScheme="brand" variant="ghost" mr={4}>
-                  Dashboard
+            <HStack spacing={4} mr={4} align="center">
+              <NextLink href="/dashboard">
+                  <Button colorScheme="brand" variant="ghost">
+                    Dashboard
+                  </Button>
+              </NextLink>
+              {/* VANGUARD DIRECTIVE: Replace "Clients" link with a direct link to the Command Roster */}
+              <NextLink href="/dashboard/quotes">
+                  <Button colorScheme="brand" variant="ghost">
+                    Documents
+                  </Button>
+              </NextLink>
+              
+              {/* VANGUARD DIRECTIVE: ADD HIGH-VISIBILITY "CREATE" BUTTON */}
+              {/* This is the new, correct link to the InvoiceForm for creating documents. */}
+              <NextLink href="/quote/new" passHref>
+                <Button colorScheme="brand" variant="solid" leftIcon={<AddIcon />}>
+                  Create
                 </Button>
-            </NextLink>
+              </NextLink>
+            </HStack>
             <UserButton afterSignOutUrl="/" />
           </SignedIn>
         </Flex>

@@ -1,82 +1,84 @@
-// /src/components/LogoUploader.tsx
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import {
-  Box, Text, Image, Center, VStack, Icon, useColorModeValue, Button
-} from '@chakra-ui/react';
+import { Box, Image, Text, VStack, Button, Icon, Center, useColorModeValue } from '@chakra-ui/react';
 import { FiUploadCloud, FiTrash2 } from 'react-icons/fi';
-import { Control, useController } from 'react-hook-form'; // Import Control and useController
-import { InvoiceFormData } from '../types/invoice';
 
-// --- FIX: Define props to accept control object ---
+// This component NO LONGER uses onFileSelect. It is self-contained.
 interface LogoUploaderProps {
-  onLogoUpload: (base64: string | null) => void;
-  control: Control<InvoiceFormData>;
+  currentLogoUrl?: string | null;
 }
 
-const LogoUploader = ({ onLogoUpload, control }: LogoUploaderProps) => {
-  const [preview, setPreview] = useState<string | null>(null);
+const LogoUploader: React.FC<LogoUploaderProps> = ({ currentLogoUrl }) => {
+  const [preview, setPreview] = useState<string | null>(currentLogoUrl || null);
   const borderColor = useColorModeValue('gray.300', 'gray.600');
-  const hoverBorderColor = useColorModeValue('brand.500', 'brand.300');
+  const hoverBorderColor = useColorModeValue('blue.500', 'blue.300');
 
-  // --- FIX: This hook now works because control is passed in ---
-  const { field } = useController({ name: 'logo', control });
+  useEffect(() => {
+    setPreview(currentLogoUrl || null);
+  }, [currentLogoUrl]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setPreview(base64String);
-        onLogoUpload(base64String);
-        field.onChange(base64String); // Update react-hook-form state
-      };
-      reader.readAsDataURL(file);
+      const previewUrl = URL.createObjectURL(file);
+      setPreview(previewUrl);
     }
-  }, [onLogoUpload, field]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.jpeg', '.png', '.jpg', '.svg'] },
-    maxSize: 1048576, // 1MB
+    maxSize: 2 * 1024 * 1024, // 2MB limit
+    multiple: false,
   });
 
-  const handleRemoveLogo = () => {
+  const handleRemove = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Stop the file dialog from opening
     setPreview(null);
-    onLogoUpload(null);
-    field.onChange(null); // Update react-hook-form state
+    // We clear the file input by resetting the form if needed, but for server actions,
+    // not having a file is enough to signal removal if we code it that way.
+    // Let's ensure the input is cleared.
+    const fileInput = document.getElementById('logo-input') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
   };
 
   return (
-    <Box w="100%">
-      {preview ? (
-        <Center flexDirection="column">
-          <Image src={preview} alt="Logo preview" boxSize="100px" objectFit="contain" mb={4} />
-          <Button onClick={handleRemoveLogo} size="sm" variant="outline" colorScheme="red" leftIcon={<FiTrash2 />}>
-            Remove Logo
-          </Button>
-        </Center>
-      ) : (
-        <Center
-          {...getRootProps()}
-          border="2px dashed"
-          borderColor={isDragActive ? hoverBorderColor : borderColor}
-          borderRadius="md"
-          p={8}
-          cursor="pointer"
-          textAlign="center"
-          transition="border-color 0.2s ease"
-          w="100%"
-        >
-          <input {...getInputProps()} />
+    <Box w="100%" p={6} borderWidth={1} borderRadius="md">
+      <Center
+        {...getRootProps()}
+        border="2px dashed"
+        borderColor={isDragActive ? hoverBorderColor : borderColor}
+        borderRadius="md"
+        p={8}
+        cursor="pointer"
+        textAlign="center"
+        transition="border-color 0.2s ease"
+        w="100%"
+        position="relative" // For positioning the remove button
+      >
+        {/* The name="logo" is CRITICAL for the server action */}
+        <input {...getInputProps()} name="logo" id="logo-input" />
+        
+        {preview ? (
+            <Image src={preview} alt="Company Logo" boxSize="150px" objectFit="contain" />
+        ) : (
           <VStack>
             <Icon as={FiUploadCloud} boxSize={8} color="gray.500" />
             <Text>Drop your logo here, or click to select</Text>
-            <Text fontSize="sm" color="gray.500">PNG, JPG, SVG up to 1MB</Text>
+            <Text fontSize="sm" color="gray.500">PNG, JPG, SVG up to 2MB</Text>
           </VStack>
+        )}
+      </Center>
+      
+      {preview && (
+        <Center mt={4}>
+            <Button onClick={handleRemove} size="sm" variant="outline" colorScheme="red" leftIcon={<FiTrash2 />}>
+                Remove / Change Logo
+            </Button>
         </Center>
       )}
     </Box>

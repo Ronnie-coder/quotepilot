@@ -1,13 +1,34 @@
 // /src/styles/theme.ts
 import { extendTheme, type ThemeConfig } from '@chakra-ui/react';
+import { mode } from '@chakra-ui/theme-tools';
 
 const config: ThemeConfig = {
   initialColorMode: 'light',
   useSystemColorMode: false,
 };
 
+const styles = {
+  global: (props: any) => ({
+    body: {
+      bg: mode('gray.50', '#000000')(props), // Light grey for light mode, pure black for dark
+      color: mode('gray.800', 'whiteAlpha.900')(props),
+    },
+  }),
+};
+
+const components = {
+  // Example of component-specific styling if needed in the future
+  // Button: {
+  //   baseStyle: {
+  //     fontWeight: 'bold',
+  //   },
+  // },
+};
+
 const theme = extendTheme({
   config,
+  styles,
+  components,
   fonts: {
     heading: `'Inter', sans-serif`,
     body: `'Inter', sans-serif`,

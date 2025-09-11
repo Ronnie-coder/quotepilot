@@ -27,7 +27,7 @@ export const generatePdf = (data: PdfData) => {
 
   // --- 1. HEADER SECTION ---
   doc.setFillColor(brandColor);
-  doc.rect(0, 0, docWidth, 25, 'F'); // Blue header bar
+  doc.rect(0, 0, docWidth, 25, 'F');
   
   if (data.logo) {
     try {
@@ -42,45 +42,48 @@ export const generatePdf = (data: PdfData) => {
 
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor('#FFFFFF'); // White text on blue bar
-  doc.text(data.documentType.toUpperCase(), docWidth - margin, 17, { align: 'right' });
+  doc.setTextColor('#FFFFFF');
+  // <<< SANITIZED >>> Ensures documentType is always a string
+  doc.text(String(data.documentType || 'DOCUMENT').toUpperCase(), docWidth - margin, 17, { align: 'right' });
 
   // --- 2. FROM & TO SECTION ---
   let yPos = 40;
   doc.setFontSize(9);
-  doc.setTextColor('#888888'); // Light grey for labels
+  doc.setTextColor('#888888');
   doc.text('FROM', margin, yPos);
   doc.text('TO', docWidth / 2, yPos);
 
-  doc.setDrawColor('#DDDDDD'); // Light line separator
+  doc.setDrawColor('#DDDDDD');
   doc.line(margin, yPos + 3, docWidth - margin, yPos + 3);
 
   yPos += 8;
   doc.setFontSize(10);
   doc.setTextColor('#000000');
   doc.setFont('helvetica', 'bold');
-  doc.text(data.from.name, margin, yPos);
-  doc.text(data.to.name, docWidth / 2, yPos);
+  // <<< SANITIZED >>> Protects against missing names
+  doc.text(String(data.from.name || ''), margin, yPos);
+  doc.text(String(data.to.name || ''), docWidth / 2, yPos);
 
   doc.setFont('helvetica', 'normal');
   yPos += 5;
-  doc.text(data.from.address, margin, yPos);
-  doc.text(data.to.address, docWidth / 2, yPos);
+  // <<< SANITIZED >>> Protects against missing addresses
+  doc.text(String(data.from.address || ''), margin, yPos);
+  doc.text(String(data.to.address || ''), docWidth / 2, yPos);
   yPos += 5;
+  // This was already correct, well done.
   doc.text(data.from.email || '', margin, yPos);
   doc.text(data.to.email || '', docWidth / 2, yPos);
 
   // --- 3. DOCUMENT DETAILS SECTION ---
   yPos += 15;
-  doc.setFillColor('#F5F5F5'); // Light grey background for this box
+  doc.setFillColor('#F5F5F5');
   
-  // Smart differentiation: Only show Due Date for Invoices
   const detailsHeight = data.documentType === 'Invoice' ? 20 : 13;
   doc.roundedRect(docWidth - margin - 60, yPos - 5, 60, detailsHeight, 3, 3, 'F');
 
   doc.setFontSize(9);
   doc.setTextColor('#555555');
-  doc.text(`${data.documentType} #:`, docWidth - margin - 55, yPos);
+  doc.text(`${String(data.documentType || 'Doc')} #:`, docWidth - margin - 55, yPos);
   doc.text('Date:', docWidth - margin - 55, yPos + 7);
   if (data.documentType === 'Invoice') {
     doc.text('Due Date:', docWidth - margin - 55, yPos + 14);
@@ -88,7 +91,8 @@ export const generatePdf = (data: PdfData) => {
 
   doc.setTextColor('#000000');
   doc.setFont('helvetica', 'bold');
-  doc.text(data.invoiceNumber, docWidth - margin, yPos, { align: 'right' });
+  // <<< SANITIZED >>> Protects against missing invoice number
+  doc.text(String(data.invoiceNumber || ''), docWidth - margin, yPos, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.text(formatDisplayDate(data.invoiceDate), docWidth - margin, yPos + 7, { align: 'right' });
   if (data.documentType === 'Invoice') {
@@ -98,7 +102,7 @@ export const generatePdf = (data: PdfData) => {
   // --- 4. LINE ITEMS TABLE ---
   const tableColumns = ["Description", "Qty", "Unit Price", "Total"];
   const tableRows = data.lineItems.map(item => [
-    item.description,
+    String(item.description || ''), // <<< SANITIZED >>>
     item.quantity.toString(),
     `R ${item.unitPrice.toFixed(2)}`,
     `R ${(item.quantity * item.unitPrice).toFixed(2)}`
@@ -127,7 +131,8 @@ export const generatePdf = (data: PdfData) => {
     doc.setFont('helvetica', 'bold');
     doc.text('Notes:', margin, notesY);
     doc.setFont('helvetica', 'normal');
-    const splitNotes = doc.splitTextToSize(data.notes, docWidth / 2 - margin * 2);
+    // <<< SANITIZED >>> Protects the splitTextToSize function
+    const splitNotes = doc.splitTextToSize(String(data.notes || ''), docWidth / 2 - margin * 2);
     doc.text(splitNotes, margin, notesY + 5);
   }
 
@@ -156,6 +161,7 @@ export const generatePdf = (data: PdfData) => {
   doc.setFont('helvetica', 'bold');
   doc.text('Payment Details:', margin, footerY + 8);
   doc.setFont('helvetica', 'normal');
+  // This was also correct, well done.
   doc.text(
     `Bank: ${data.payment.bankName || 'N/A'} | ` +
     `Account Holder: ${data.payment.accountHolder || 'N/A'} | ` +
