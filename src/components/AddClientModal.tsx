@@ -1,3 +1,4 @@
+// FILE: src/components/AddClientModal.tsx
 'use client';
 
 import { useState } from 'react';
@@ -51,15 +52,14 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
         user_id: user.id,
       })
       .select()
-      .single(); // .select().single() returns the newly created record
+      .single();
 
     if (error) {
       toast({ title: 'Error creating client', description: error.message, status: 'error' });
     } else {
       toast({ title: 'Client added successfully', status: 'success' });
-      onClientAdded(data); // Pass the new client back to the parent page
-      onClose(); // Close the modal
-      // Reset form fields
+      onClientAdded(data);
+      onClose();
       setName('');
       setEmail('');
       setAddress('');
@@ -80,7 +80,8 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
               <Input
                 placeholder="e.g., John Doe or Acme Inc."
                 value={name}
-                onChange={(e) => setName(e.g., target.value)}
+                // --- CORRECTION IMPLEMENTED ---
+                onChange={(e) => setName(e.target.value)}
               />
             </FormControl>
             <FormControl>
