@@ -30,7 +30,9 @@ export interface InvoiceFormData {
     unitPrice: number;
   }[];
   
+  // --- CORRECTION IMPLEMENTED ---
   // Financials
+  applyVat?: boolean; // This missing field was the root cause of recent build failures.
   vatRate: number; // Stored as a percentage, e.g., 15 for 15%
 
   // Payment Info
