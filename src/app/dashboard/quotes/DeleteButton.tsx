@@ -14,20 +14,22 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { DeleteIcon } from '@chakra-ui/icons';
-import React, { useState, useTransition } from 'react';
-import { deleteQuoteAction } from './actions'; // Importing our Server Action
+import React, { useTransition } from 'react';
+import { deleteQuoteAction } from './actions';
 
+// --- CORRECTION 1: Type definition updated ---
+// The component's prop interface now accepts 'isDisabled'.
 type DeleteButtonProps = {
   quoteId: string;
   clientName: string;
+  isDisabled?: boolean; // This property is now defined.
 };
 
-export function DeleteButton({ quoteId, clientName }: DeleteButtonProps) {
+export function DeleteButton({ quoteId, clientName, isDisabled }: DeleteButtonProps) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = React.useRef<HTMLButtonElement>(null);
   const toast = useToast();
   
-  // useTransition is a React hook for handling pending states of server actions
   const [isPending, startTransition] = useTransition();
 
   const handleDelete = () => {
@@ -64,6 +66,10 @@ export function DeleteButton({ quoteId, clientName }: DeleteButtonProps) {
         colorScheme="red"
         onClick={onOpen}
         isLoading={isPending}
+        // --- CORRECTION 2: Prop implemented ---
+        // The isDisabled prop is now passed to the underlying IconButton,
+        // correctly disabling it when other actions are in progress.
+        isDisabled={isDisabled || isPending}
       />
 
       <AlertDialog
