@@ -1,3 +1,4 @@
+// FILE: src/app/dashboard/clients/ClientsClientPage.tsx
 'use client';
 
 import { useState } from 'react';
@@ -6,19 +7,18 @@ import {
   Heading,
   Text,
   VStack,
-  Spinner,
   Button,
-  HStack,
   useColorModeValue,
   useDisclosure,
   Flex,
   Spacer
 } from '@chakra-ui/react';
 import { AddIcon } from '@chakra-ui/icons';
-import { User } from '@supabase/supabase-js';
-import AddClientModal from '@/components/AddClientModal'; // We will create this next
+import { User } from '@supabase/supabase-js'; // Keep this for the Modal
+import AddClientModal from '@/components/AddClientModal';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // Import for user session
 
-// Define the Client type based on your supabase.ts
+// This type must match the data fetched in page.tsx
 type Client = {
   id: string;
   name: string | null;
@@ -28,31 +28,45 @@ type Client = {
   created_at: string | null;
 };
 
+// --- CORRECTION IMPLEMENTED ---
+// The component now correctly expects a 'clients' prop.
 type ClientsClientPageProps = {
-  initialClients: Client[];
-  user: User;
+  clients: Client[];
 };
 
-export default function ClientsClientPage({ initialClients, user }: ClientsClientPageProps) {
+export default function ClientsClientPage({ clients: initialClients }: ClientsClientPageProps) {
   const [clients, setClients] = useState<Client[]>(initialClients);
-  const { isOpen, onOpen, onClose } = useDisclosure(); // Hook to control the modal
+  const [user, setUser] = useState<User | null>(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const cardBg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
+
+  // --- ENHANCEMENT: Get user on the client-side for the modal ---
+  useState(() => {
+    const supabase = createSupabaseBrowserClient();
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
   
-  // This function will be passed to the modal to refresh the client list
   const handleClientAdded = (newClient: Client) => {
     setClients(currentClients => [newClient, ...currentClients]);
   };
 
   return (
     <>
-      <AddClientModal 
-        isOpen={isOpen} 
-        onClose={onClose} 
-        user={user}
-        onClientAdded={handleClientAdded}
-      />
+      {/* The modal now only renders if we have a user session */}
+      {user && (
+        <AddClientModal 
+          isOpen={isOpen} 
+          onClose={onClose} 
+          user={user}
+          onClientAdded={handleClientAdded}
+        />
+      )}
 
       <Box p={8} flex="1">
         <Flex direction={{ base: 'column', md: 'row' }} mb={8}>
@@ -61,7 +75,8 @@ export default function ClientsClientPage({ initialClients, user }: ClientsClien
           <Button 
             leftIcon={<AddIcon />} 
             colorScheme="brand" 
-            onClick={onOpen} // This button now opens the modal
+            onClick={onOpen}
+            isDisabled={!user} // Disable button until user is loaded
             mt={{ base: 4, md: 0 }}
           >
             Add New Client
