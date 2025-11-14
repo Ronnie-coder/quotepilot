@@ -46,9 +46,16 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   useEffect(() => {
     if (defaultValues) {
       const client = clients.find(c => c.id === defaultValues.client_id);
+      
+      // --- CORRECTIVE ACTION IMPLEMENTED ---
+      // This logic prevents a crash if date values from the DB are null.
+      // It tries invoice_date, falls back to created_at, and finally to today's date.
+      const safeDateSource = defaultValues.invoice_date || defaultValues.created_at;
+      const invoiceDate = new Date(safeDateSource || new Date()).toISOString().substring(0, 10);
+
       reset({
         invoiceNumber: defaultValues.invoice_number || '',
-        invoiceDate: defaultValues.invoice_date ? new Date(defaultValues.invoice_date).toISOString().substring(0, 10) : new Date(defaultValues.created_at).toISOString().substring(0, 10),
+        invoiceDate: invoiceDate, // Use the hardened, null-safe date
         dueDate: defaultValues.due_date ? new Date(defaultValues.due_date).toISOString().substring(0, 10) : '',
         to: { name: client?.name || 'Client Not Found', email: client?.email || '', address: client?.address || '' },
         lineItems: defaultValues.line_items ? (defaultValues.line_items as any) : [{ description: '', quantity: 1, unitPrice: 0 }],
@@ -77,12 +84,11 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lineItems' });
 
-  // --- MISSION CRITICAL: Re-integration of your original, functional logic ---
   const onSubmit = async (data: InvoiceFormData) => {
     setIsSubmitting(true);
     try {
       let result;
-      if (isEditing) {
+      if (isEditing && defaultValues) {
         result = await updateQuoteAction({
           quoteId: defaultValues.id, formData: data, documentType: documentType, total: total,
         });
@@ -102,13 +108,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
 
   const handleDownloadPdf = async () => {
     if (!defaultValues?.id) {
-      toast({
-        title: 'Cannot Download',
-        description: 'Document must be saved before a PDF can be generated.',
-        status: 'warning',
-        duration: 4000,
-        isClosable: true,
-      });
+      toast({ title: 'Cannot Download', description: 'Document must be saved first.', status: 'warning' });
       return;
     }
     
@@ -118,23 +118,15 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       if (result.success && result.pdfData) {
         const link = document.createElement('a');
         link.href = `data:application/pdf;base64,${result.pdfData}`;
-        link.download = result.fileName || `document_${defaultValues.invoice_number}.pdf`;
+        link.download = result.fileName || `document.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast({ title: 'Download Started', status: 'success', duration: 3000, isClosable: true });
       } else {
-        throw new Error(result.error || 'An unknown error occurred during PDF generation.');
+        throw new Error(result.error || 'An unknown PDF error occurred.');
       }
     } catch (error) {
-      console.error("PDF Download Error:", error);
-      toast({
-        title: 'PDF Generation Failed',
-        description: error instanceof Error ? error.message : 'Could not generate the PDF.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      toast({ title: 'PDF Generation Failed', description: error instanceof Error ? error.message : 'Could not generate the PDF.', status: 'error' });
     } finally {
       setIsDownloading(false);
     }
@@ -153,7 +145,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
               <Box bg={useColorModeValue('gray.50', 'gray.700')} p={4} borderRadius="md">
                 <Text fontSize="sm" fontWeight="bold" color={useColorModeValue('gray.600', 'gray.400')}>FROM</Text>
-                <Text fontWeight="bold" mt={1}>{profile?.company_name || 'Set company name in settings'}</Text>
+                <Text fontWeight="bold" mt={1}>{profile?.company_name || 'Set company name'}</Text>
                 <Text fontSize="sm" color="gray.500">{profile?.company_address}</Text>
               </Box>
               <Box>
