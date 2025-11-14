@@ -1,7 +1,6 @@
 // File: src/app/api/profile/route.ts
 
 import { createClient } from '@supabase/supabase-js';
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { UserProfile } from '@/types/profile';
 

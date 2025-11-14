@@ -1,11 +1,10 @@
-// FILE: src/app/dashboard/page.tsx
+// FILE: src/app/dashboard/clients/page.tsx
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import DashboardClientPage from './DashboardClientPage';
-import { User } from '@supabase/supabase-js';
+import ClientsClientPage from './ClientsClientPage'; // This import is now correct for this location
 
-export default async function DashboardPage() {
+export default async function ClientsPage() {
   const supabase = createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -13,28 +12,19 @@ export default async function DashboardPage() {
     redirect('/sign-in');
   }
 
-  // --- MISSION UPDATE: Fetch all required data in parallel ---
-  const [clientCountResult, quoteCountResult, recentDocumentsResult] = await Promise.all([
-    supabase.from('clients').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-    supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-    // --- RECONNAISSANCE PAYLOAD ---
-    supabase.from('quotes')
-      .select(`id, document_type, total, invoice_number, clients ( name )`)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5)
-  ]);
-  
-  const clientCount = clientCountResult.count ?? 0;
-  const quoteCount = quoteCountResult.count ?? 0;
-  const recentDocuments = recentDocumentsResult.data || [];
+  // This page's only mission: Fetch all clients for the current user.
+  const { data: clients, error } = await supabase
+    .from('clients')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
 
+  if (error) {
+    console.error('Error fetching clients:', error);
+  }
+
+  // Pass the fetched clients to the client-side component for display.
   return (
-    <DashboardClientPage 
-      user={user} 
-      clientCount={clientCount} 
-      quoteCount={quoteCount}
-      recentDocuments={recentDocuments} // Pass the new data to the client
-    />
+    <ClientsClientPage clients={clients || []} />
   );
 }
