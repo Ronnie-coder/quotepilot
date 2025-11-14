@@ -6,22 +6,27 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { generatePdf } from '@/utils/pdfGenerator';
 
+// --- CORRECTION IMPLEMENTED ---
+// The InvoiceFormData type is augmented locally to include the missing property.
+// This resolves the TypeScript error without needing to modify the original type file.
+type FormDataWithVat = InvoiceFormData & {
+  applyVat?: boolean;
+};
+
 type QuotePayload = {
-  formData: InvoiceFormData;
+  formData: FormDataWithVat;
   documentType: 'Quote' | 'Invoice';
   total: number;
 };
 
 type UpdateQuotePayload = {
   quoteId: string;
-  formData: InvoiceFormData;
+  formData: FormDataWithVat;
   documentType: 'Quote' | 'Invoice';
   total: number;
 };
 
-// --- (Existing Action - UNCHANGED) ---
 export const createQuoteAction = async ({ formData, documentType, total }: QuotePayload) => {
-    // ... your existing create logic is preserved ...
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { throw new Error('Authentication Error: User not found.'); }
@@ -46,8 +51,8 @@ export const createQuoteAction = async ({ formData, documentType, total }: Quote
         document_type: documentType, user_id: userId, client_id: clientId, line_items: formData.lineItems as any, 
         notes: formData.notes, total: total, invoice_number: formData.invoiceNumber, invoice_date: formData.invoiceDate,
         due_date: (documentType === 'Invoice' && formData.dueDate) ? formData.dueDate : null, 
+        // This line is now type-safe
         vat_rate: formData.applyVat ? formData.vatRate : 0,
-        // status is defaulted to 'draft' by the database, no need to set here
       };
       const { error: quoteError } = await supabase.from('quotes').insert(documentPayload);
       if (quoteError) { throw new Error(`DATABASE INSERT FAILED: ${quoteError.message}`); }
@@ -60,9 +65,7 @@ export const createQuoteAction = async ({ formData, documentType, total }: Quote
     redirect('/dashboard/quotes');
 };
 
-// --- (Existing Action - UNCHANGED) ---
 export const updateQuoteAction = async ({ quoteId, formData, documentType, total }: UpdateQuotePayload) => {
-    // ... your existing update logic is preserved ...
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { throw new Error('Authentication Error: User not found.'); }
@@ -82,6 +85,7 @@ export const updateQuoteAction = async ({ quoteId, formData, documentType, total
         invoice_number: formData.invoiceNumber,
         invoice_date: formData.invoiceDate,
         due_date: (documentType === 'Invoice' && formData.dueDate) ? formData.dueDate : null,
+        // This line is now type-safe
         vat_rate: formData.applyVat ? formData.vatRate : 0,
       };
   
@@ -104,9 +108,7 @@ export const updateQuoteAction = async ({ quoteId, formData, documentType, total
     redirect('/dashboard/quotes');
 };
 
-// --- (Existing Action - UNCHANGED) ---
 export const deleteQuoteAction = async (quoteId: string) => {
-    // ... your existing delete logic is preserved ...
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { return { error: 'Authentication Error: User not found.' }; }
@@ -122,9 +124,7 @@ export const deleteQuoteAction = async (quoteId: string) => {
     return { success: 'Document purged successfully.' };
 };
 
-// --- (Existing Action - UNCHANGED) ---
 export const generatePdfAction = async (quoteId: string) => {
-    // ... your existing PDF generation logic is preserved ...
     try {
         const supabase = await createSupabaseServerClient();
         const { data: { user } } = await supabase.auth.getUser();
@@ -173,7 +173,6 @@ export const generatePdfAction = async (quoteId: string) => {
       }
 };
 
-// --- COMMANDER'S NOTE: NEW TACTICAL SERVER ACTION FOR STATUS CONTROL ---
 export async function updateDocumentStatusAction(documentId: string, newStatus: string) {
   const supabase = createSupabaseServerClient();
 
@@ -194,14 +193,13 @@ export async function updateDocumentStatusAction(documentId: string, newStatus: 
     .from('quotes')
     .update({ status: newStatus })
     .eq('id', documentId)
-    .eq('user_id', user.id); // Security: Ensure user can only update their own documents
+    .eq('user_id', user.id);
 
   if (error) {
     console.error('Status Update Error:', error);
     return { success: false, error: 'Failed to update document status.' };
   }
 
-  // Revalidate the path to ensure the UI shows the latest data after mutation
   revalidatePath('/dashboard/quotes');
 
   return { success: true };
