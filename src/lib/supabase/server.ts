@@ -2,11 +2,13 @@
 
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+// --- CORRECTIVE ACTION 1: Import the base client for server-to-server operations ---
+import { createClient } from '@supabase/supabase-js';
 
 // This function is for use in Server Components, Server Actions, and Route Handlers.
 // It creates a Supabase client that can read and write cookies.
+// THIS FUNCTION IS CORRECT AND REMAINS UNCHANGED.
 export const createSupabaseServerClient = () => {
-  // Get the cookie store from the Next.js headers
   const cookieStore = cookies();
 
   return createServerClient(
@@ -14,20 +16,16 @@ export const createSupabaseServerClient = () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // The get method is used to read cookies
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        // The set method is used to write cookies (in Server Actions/Route Handlers)
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value, ...options });
           } catch (error) {
             // This can happen in Server Components. The error is expected and can be ignored.
-            // The library will still work in read-only mode.
           }
         },
-        // The remove method is used to delete cookies (in Server Actions/Route Handlers)
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options });
@@ -40,11 +38,14 @@ export const createSupabaseServerClient = () => {
   );
 };
 
-// This function is a legacy or alternative pattern. For now, we will rely on the single, robust
-// function above. You can remove this if it's not being used elsewhere.
+// --- CORRECTIVE ACTION 2: Reconfigure the Admin Client ---
+// This function is for privileged, server-to-server operations that need to bypass RLS.
+// It must use the base `createClient` with the service role key, not the SSR-specific client.
 export const createSupabaseAdminClient = () => {
-    return createServerClient(
+    // Using the correct 'createClient' function for a service role client.
+    return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
+        // The third 'cookies' argument is not required here, which resolves the build error.
     );
 }
