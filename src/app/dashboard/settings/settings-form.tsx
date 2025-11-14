@@ -14,9 +14,6 @@ import { uploadLogoAction } from './actions';
 import LogoUploader from '@/components/LogoUploader';
 import { Building, Banknote, FileText, UploadCloud } from 'lucide-react';
 
-// --- CORRECTIVE ACTION IMPLEMENTED ---
-// The base 'profiles' type is missing the banking fields added to the database.
-// This extended type makes TypeScript aware of them, resolving the build error.
 type ProfileWithBanking = Tables<'profiles'> & {
   bank_name?: string | null;
   account_holder?: string | null;
@@ -73,9 +70,7 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
         duration: 5000,
         isClosable: true,
       });
-      if (logoState.success) {
-        router.refresh(); 
-      }
+      if (logoState.success) { router.refresh(); }
     }
   }, [logoState, toast, router]);
   
@@ -99,8 +94,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const [companyPhone, setCompanyPhone] = useState(profile?.company_phone || '');
   const [vatNumber, setVatNumber] = useState(profile?.vat_number || '');
   const [terms, setTerms] = useState(profile?.terms_conditions || '');
-  
-  // These initial state values are now type-safe due to the extended ProfileWithBanking type.
   const [bankName, setBankName] = useState(profile?.bank_name || '');
   const [accountHolder, setAccountHolder] = useState(profile?.account_holder || '');
   const [accountNumber, setAccountNumber] = useState(profile?.account_number || '');
@@ -112,13 +105,20 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const { error } = await supabase.from('profiles').upsert({
+    
+    const payload = {
       id: user.id, company_name: companyName, company_address: companyAddress,
       company_phone: companyPhone, vat_number: vatNumber, terms_conditions: terms,
       bank_name: bankName, account_holder: accountHolder, account_number: accountNumber,
       branch_code: branchCode, branch_name: branchName, account_type: accountType,
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    // --- TACTICAL OVERRIDE IMPLEMENTED ---
+    // We cast the payload to 'any' to bypass the stale, auto-generated Supabase types.
+    // This forces the client to send our correct, complete payload to the database.
+    const { error } = await supabase.from('profiles').upsert(payload as any);
+
     if (error) {
       toast({ title: 'Error Updating Profile', description: error.message, status: 'error' });
     } else {
@@ -132,7 +132,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     <Box>
       <VStack spacing={8} align="stretch">
         <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={8}>
-          
           <GridItem as="form" onSubmit={handleDetailsSubmit}>
             <VStack spacing={8} align="stretch" h="full">
                 <SettingsSection title="Company Profile" icon={Building}>
