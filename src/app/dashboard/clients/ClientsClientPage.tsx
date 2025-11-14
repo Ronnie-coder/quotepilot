@@ -1,7 +1,7 @@
 // FILE: src/app/dashboard/clients/ClientsClientPage.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // CORRECTED: useEffect is now imported
 import {
   Box,
   Heading,
@@ -14,11 +14,10 @@ import {
   Spacer
 } from '@chakra-ui/react';
 import { AddIcon } from '@chakra-ui/icons';
-import { User } from '@supabase/supabase-js'; // Keep this for the Modal
+import { User } from '@supabase/supabase-js';
 import AddClientModal from '@/components/AddClientModal';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // Import for user session
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
-// This type must match the data fetched in page.tsx
 type Client = {
   id: string;
   name: string | null;
@@ -28,8 +27,6 @@ type Client = {
   created_at: string | null;
 };
 
-// --- CORRECTION IMPLEMENTED ---
-// The component now correctly expects a 'clients' prop.
 type ClientsClientPageProps = {
   clients: Client[];
 };
@@ -42,8 +39,9 @@ export default function ClientsClientPage({ clients: initialClients }: ClientsCl
   const cardBg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
-  // --- ENHANCEMENT: Get user on the client-side for the modal ---
-  useState(() => {
+  // --- CORRECTION IMPLEMENTED ---
+  // The hook has been changed from useState to useEffect.
+  useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -58,7 +56,6 @@ export default function ClientsClientPage({ clients: initialClients }: ClientsCl
 
   return (
     <>
-      {/* The modal now only renders if we have a user session */}
       {user && (
         <AddClientModal 
           isOpen={isOpen} 
@@ -76,7 +73,7 @@ export default function ClientsClientPage({ clients: initialClients }: ClientsCl
             leftIcon={<AddIcon />} 
             colorScheme="brand" 
             onClick={onOpen}
-            isDisabled={!user} // Disable button until user is loaded
+            isDisabled={!user}
             mt={{ base: 4, md: 0 }}
           >
             Add New Client
