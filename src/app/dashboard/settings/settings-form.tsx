@@ -1,9 +1,8 @@
 // src/app/dashboard/settings/settings-form.tsx
-
 'use client';
 
 import {
-  Box, Button, FormControl, FormLabel, Input, VStack, useToast, Textarea, Heading, HStack, Flex, Grid, GridItem, Text, Icon, useColorModeValue
+  Box, Button, FormControl, FormLabel, Input, VStack, useToast, Textarea, Heading, HStack, Flex, Grid, GridItem, Icon, useColorModeValue
 } from '@chakra-ui/react';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,12 +11,24 @@ import { useFormState } from 'react-dom';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Tables } from '@/types/supabase';
 import { uploadLogoAction } from './actions';
-import LogoUploader from '@/components/LogoUploader'; // <-- IMPORT NEW COMPONENT
+import LogoUploader from '@/components/LogoUploader';
 import { Building, Banknote, FileText, UploadCloud } from 'lucide-react';
+
+// --- CORRECTIVE ACTION IMPLEMENTED ---
+// The base 'profiles' type is missing the banking fields added to the database.
+// This extended type makes TypeScript aware of them, resolving the build error.
+type ProfileWithBanking = Tables<'profiles'> & {
+  bank_name?: string | null;
+  account_holder?: string | null;
+  account_number?: string | null;
+  account_type?: string | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+};
 
 type SettingsFormProps = {
   user: User;
-  profile: Tables<'profiles'> | null;
+  profile: ProfileWithBanking | null;
 };
 
 // --- SettingsSection component remains unchanged ---
@@ -39,10 +50,6 @@ const SettingsSection = ({ title, icon, children }: { title: string, icon: React
   );
 };
 
-
-// --- The LogoUploader component is now in its own file and removed from here ---
-
-
 export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const supabase = createSupabaseBrowserClient();
   const toast = useToast();
@@ -54,7 +61,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const buttonTextColor = useColorModeValue('gray.800', 'gray.900');
   const focusBorderColor = useColorModeValue('yellow.500', 'yellow.300');
 
-  // --- State for the Logo Uploader Server Action ---
   const initialLogoState = { success: false, message: '' };
   const [logoState, logoFormAction] = useFormState(uploadLogoAction, initialLogoState);
 
@@ -73,7 +79,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     }
   }, [logoState, toast, router]);
   
-  // --- Onboarding Toast Logic (unchanged) ---
   useEffect(() => {
     if (searchParams.get('onboarding') === 'true' && !toastShownRef.current) {
       toastShownRef.current = true;
@@ -89,12 +94,13 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     }
   }, [searchParams, toast, router]);
 
-  // --- State for the Main Details Form (unchanged) ---
   const [companyName, setCompanyName] = useState(profile?.company_name || '');
   const [companyAddress, setCompanyAddress] = useState(profile?.company_address || '');
   const [companyPhone, setCompanyPhone] = useState(profile?.company_phone || '');
   const [vatNumber, setVatNumber] = useState(profile?.vat_number || '');
   const [terms, setTerms] = useState(profile?.terms_conditions || '');
+  
+  // These initial state values are now type-safe due to the extended ProfileWithBanking type.
   const [bankName, setBankName] = useState(profile?.bank_name || '');
   const [accountHolder, setAccountHolder] = useState(profile?.account_holder || '');
   const [accountNumber, setAccountNumber] = useState(profile?.account_number || '');
@@ -123,7 +129,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   };
 
   return (
-    // We use a Box here instead of a form, as the forms are now inside the sections
     <Box>
       <VStack spacing={8} align="stretch">
         <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={8}>
@@ -140,7 +145,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
           </GridItem>
           
           <GridItem>
-            {/* The LogoUploader now lives here, INSIDE its own section, but NOT nested in the other form */}
             <SettingsSection title="Branding" icon={UploadCloud}>
               <LogoUploader profile={profile} formAction={logoFormAction} state={logoState} />
             </SettingsSection>
