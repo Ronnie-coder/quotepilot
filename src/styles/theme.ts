@@ -1,6 +1,13 @@
-// FILE: src/styles/theme.ts (COMPLETE & UPGRADED)
+// FILE: src/styles/theme.ts (VICTORY CODE)
 import { extendTheme, type ThemeConfig } from '@chakra-ui/react';
-import { mode } from '@chakra-ui/theme-tools';
+
+// --- TACTICAL MODERNIZATION IMPLEMENTED ---
+// The '@chakra-ui/theme-tools' package is deprecated. The 'mode' function it provided
+// is recreated here to maintain theme functionality without the missing dependency.
+// This makes the theme self-reliant and compliant with modern Chakra UI versions.
+const mode = (light: string, dark: string) => (props: { colorMode: 'light' | 'dark' }) => {
+  return props.colorMode === 'dark' ? dark : light;
+};
 
 const config: ThemeConfig = {
   initialColorMode: 'light',
@@ -10,7 +17,6 @@ const config: ThemeConfig = {
 const styles = {
   global: (props: any) => ({
     body: {
-      // TACTICAL UPGRADE: Pure white and pure black for high contrast
       bg: mode('#FFFFFF', '#000000')(props),
       color: mode('gray.800', 'gray.100')(props),
     },
@@ -22,7 +28,7 @@ const components = {
     variants: {
       solid: (props: any) => ({
         bg: 'brand.500',
-        color: 'gray.900', // High contrast text on gold button
+        color: 'gray.900',
         _hover: { 
           bg: 'brand.600',
           _disabled: {
@@ -30,7 +36,6 @@ const components = {
           }
         },
       }),
-      // TACTICAL ADDITION: New variant for secondary CTA
       outline: (props: any) => ({
         borderColor: mode('gray.800', 'white')(props),
         color: mode('gray.800', 'white')(props),
