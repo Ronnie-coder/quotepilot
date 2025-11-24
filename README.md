@@ -3,19 +3,18 @@
 **QuotePilot is a streamlined, open-source quoting application designed for freelancers and small businesses. Create, manage, and send professional client quotes with ease.**
 
 ![QuotePilot Dashboard Screenshot](https://app.coderon.co.za/placeholder-image.jpg) 
-*(Commander, replace this with a screenshot of the main dashboard)*
 
-**Live Application:** [**app.coderon.co.za**](https://app.coderon.co.za)
+Live Application:[app.coderon.co.za](https://app.coderon.co.za)
 
 ---
 
-## Overview
+ Overview
 
 This project was born out of the frustration with overpriced, complex quoting software. The goal of QuotePilot is to provide a fast, secure, and intuitive platform for managing clients and generating professional PDF quotes, empowering small businesses to present a polished image without the high cost.
 
 This application is the property of CODERON PTY LTD.
 
-## Core Features
+Core Features
 
 -   **Secure Authentication:** Full user authentication with email/password, Google, and GitHub providers. Includes secure password reset functionality.
 -   **Client Management (CRUD):** Full Create, Read, Update, and Delete capabilities for your client database.
