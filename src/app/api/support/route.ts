@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// FIX APPLIED: Removed top-level initialization to prevent build crashes
 
 export async function POST(request: Request) {
   try {
+    // FIX APPLIED: Initialize Resend inside the handler
+    // This ensures it only runs at runtime, not build time.
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
     const body = await request.json();
     const { email, topic, message } = body;
 
