@@ -69,8 +69,21 @@ export default async function DashboardPage() {
 
   const clientCount = clientCountResult.count ?? 0;
   const quoteCount = quoteCountResult.count ?? 0;
-  const recentDocuments = recentDocumentsResult.data ?? [];
-  const overdueInvoices = overdueInvoicesResult.data ?? [];
+  
+  // --- DATA NORMALIZATION (THE BUILD FIX) ---
+  // We explicitly map the data to handle the Supabase Array-vs-Object issue.
+  
+  const recentDocuments = recentDocumentsResult.data?.map((doc: any) => ({
+    ...doc,
+    // If clients is an array, take the first item. If it's null, provide a fallback.
+    clients: Array.isArray(doc.clients) ? doc.clients[0] || { name: 'Unknown Client' } : doc.clients
+  })) ?? [];
+
+  const overdueInvoices = overdueInvoicesResult.data?.map((doc: any) => ({
+    ...doc,
+    // Same fix for overdue invoices
+    clients: Array.isArray(doc.clients) ? doc.clients[0] || { name: 'Unknown Client' } : doc.clients
+  })) ?? [];
 
   const totalRevenue =
     totalRevenueResult.data?.reduce(
@@ -78,7 +91,7 @@ export default async function DashboardPage() {
       0
     ) ?? 0;
 
-  // Pass all fetched data to the client page for rendering
+  // Pass all fetched and FORMATTED data to the client page for rendering
   return (
     <DashboardClientPage
       user={user}
@@ -86,7 +99,7 @@ export default async function DashboardPage() {
       quoteCount={quoteCount}
       totalRevenue={totalRevenue}
       recentDocuments={recentDocuments}
-      overdueInvoices={overdueInvoices} // Pass the new overdue invoices data
+      overdueInvoices={overdueInvoices}
     />
   );
 }
