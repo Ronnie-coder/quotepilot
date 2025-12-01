@@ -36,7 +36,8 @@ import {
   MenuDivider,
   MenuGroup,
   chakra,
-  Tooltip
+  Tooltip,
+  FlexProps // Import FlexProps to help with typing if needed, though chakra factory handles most
 } from '@chakra-ui/react';
 import { 
   Plus, 
@@ -59,7 +60,6 @@ import { updateDocumentStatusAction, generatePdfAction } from './actions';
 import { motion, isValidMotionProp } from 'framer-motion';
 
 // // 1.0 TYPE DEFINITIONS
-// Strictly typed to match your Supabase/Actions structure
 type DocumentStatus = 'draft' | 'sent' | 'paid' | 'overdue';
 type DocumentType = 'Quote' | 'Invoice';
 
@@ -87,6 +87,11 @@ const MotionBox = chakra(motion.div, {
 });
 
 const MotionTr = chakra(motion.tr, {
+  shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
+});
+
+// FIX: Added MotionFlex to handle the animated header correctly
+const MotionFlex = chakra(motion.div, {
   shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
 });
 
@@ -128,7 +133,7 @@ export default function QuotesClientPage({
   const searchParams = useSearchParams();
 
   // --- THEME TOKENS ---
-  const brandColor = 'brand.500'; // Confirmed via theme.ts
+  const brandColor = 'brand.500';
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const theadBg = useColorModeValue('gray.50', 'gray.900');
@@ -136,12 +141,10 @@ export default function QuotesClientPage({
   const rowHoverBg = useColorModeValue('gray.50', 'gray.700');
 
   // --- EFFECTS ---
-  // Sync state if server props change (e.g., after revalidatePath)
   useEffect(() => {
     setDocuments(initialDocuments);
   }, [initialDocuments]);
   
-  // Sync search input with URL params on mount
   useEffect(() => {
     const q = searchParams.get('q');
     if (q) setSearchQuery(q);
@@ -153,7 +156,7 @@ export default function QuotesClientPage({
     if (value) params.set(key, value);
     else params.delete(key);
     
-    params.set('page', '1'); // Reset to page 1 on filter change
+    params.set('page', '1');
     router.push(`${pathname}?${params.toString()}`);
   };
 
@@ -190,7 +193,6 @@ export default function QuotesClientPage({
     if (result.success) {
       toast({ title: 'Status Updated', status: 'success', duration: 2000, isClosable: true });
     } else {
-      // Revert on failure
       setDocuments(docs => docs.map(doc => doc.id === documentId ? { ...doc, status: currentDoc?.status || 'draft' } : doc));
       toast({ title: 'Update Failed', description: result.error, status: 'error', isClosable: true });
     }
@@ -220,8 +222,16 @@ export default function QuotesClientPage({
   return (
     <MotionBox variants={containerVariants} initial="hidden" animate="visible">
       
-      {/* 1. HEADER SECTION */}
-      <Flex variants={itemVariants} direction={{ base: 'column', md: 'row' }} justify="space-between" align={{ base: 'start', md: 'center' }} mb={8} gap={4}>
+      {/* 1. HEADER SECTION (FIXED: Using MotionFlex) */}
+      <MotionFlex 
+        variants={itemVariants} 
+        display="flex"
+        flexDirection={{ base: 'column', md: 'row' }} 
+        justifyContent="space-between" 
+        alignItems={{ base: 'start', md: 'center' }} 
+        mb={8} 
+        gap={4}
+      >
         <Box>
           <Heading as="h1" size="xl" mb={1} letterSpacing="tight">Documents</Heading>
           <Text color={mutedText}>Manage your quotes, invoices, and revenue.</Text>
@@ -239,7 +249,7 @@ export default function QuotesClientPage({
         >
           Create Document
         </Button>
-      </Flex>
+      </MotionFlex>
       
       {/* 2. CONTROLS SECTION */}
       <VStack as={motion.div} variants={itemVariants} spacing={4} align="stretch" mb={6}>
@@ -328,7 +338,7 @@ export default function QuotesClientPage({
                 ))
               ) : (
                 <Tr>
-                  <Td colSpan={7} h="300px">
+                  <Td colSpan={6} h="300px">
                     <Flex direction="column" align="center" justify="center" h="full" gap={4}>
                       <Box p={4} bg="gray.50" borderRadius="full">
                         <Icon as={Search} boxSize={8} color="gray.400" />
@@ -383,9 +393,8 @@ const DocumentRow = ({
 }: DocumentRowProps) => {
   
   const statusLower = doc.status?.toLowerCase() || 'draft';
-    let statusConfig = { color: 'gray', icon: FileText, label: 'DRAFT' };
+  let statusConfig = { color: 'gray', icon: FileText, label: 'DRAFT' };
   
-  // Tactical Visual Logic
   switch (statusLower) {
     case 'sent': 
       statusConfig = { color: 'blue', icon: Send, label: 'SENT' }; 
@@ -404,7 +413,7 @@ const DocumentRow = ({
     day: 'numeric', 
     month: 'short', 
     year: 'numeric' 
-  });
+    });
 
   return (
     <MotionTr 
@@ -468,7 +477,7 @@ const DocumentRow = ({
 
             <MenuDivider />
 
-            {/* Quick Status Updates (Flattened for Speed) */}
+            {/* Quick Status Updates */}
             <MenuGroup title="Update Status">
               {statusLower !== 'sent' && (
                 <MenuItem 
