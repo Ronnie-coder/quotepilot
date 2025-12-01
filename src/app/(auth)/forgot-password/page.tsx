@@ -1,86 +1,103 @@
-// FILE: src/app/(auth)/forgot-password/page.tsx
-// MISSION: RESTORE CORRECT FILE CONTENT TO INITIATE EMAIL PROTOCOL
 'use client';
 
 import { useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { Box, Button, Flex, FormControl, FormLabel, Input, Heading, Text, Link, Alert, AlertIcon, useColorModeValue, Stack, useToast } from '@chakra-ui/react';
+import { Box, Button, FormControl, FormLabel, Input, Heading, Text, Link, Alert, AlertIcon, useColorModeValue, Stack, useToast, Icon } from '@chakra-ui/react';
 import NextLink from 'next/link';
+import { AuthLayout } from '@/components/AuthLayout';
+import { ShieldCheck, Mail } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
   const supabase = createSupabaseBrowserClient();
-  const toast = useToast();
-  
   const [email, setEmail] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Color theme values
-  const pageBg = useColorModeValue('gray.100', 'gray.900');
-  const boxBg = useColorModeValue('white', 'gray.800');
-  const headingColor = useColorModeValue('gray.800', 'white');
-  const textColor = useColorModeValue('gray.600', 'gray.400');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const brandGold = useColorModeValue('yellow.500', 'yellow.300');
-  const brandGoldText = useColorModeValue('gray.800', 'gray.900');
-  const brandGoldHover = useColorModeValue('yellow.600', 'yellow.400');
+  // Design Tokens
+  const boxBg = useColorModeValue('white', 'gray.900');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const brandColor = 'brand.500'; // Teal Identity
 
-  const handlePasswordReset = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSubmitting(true);
     setError(null);
-    setIsSubmitted(false);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
+    // COMMANDER FIX: HARDCODED TARGET
+    // We explicitly tell Supabase: "Send them to the new HQ."
+    const targetURL = 'https://quotepilot.coderon.co.za/update-password';
+
+    console.log(`Attempting reset for ${email} -> Target: ${targetURL}`);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { 
+      redirectTo: targetURL 
     });
 
     if (error) {
-      toast({ title: 'Error', description: error.message, status: 'error', duration: 5000, isClosable: true });
+      console.error('Supabase Error:', error);
       setError(error.message);
     } else {
-      toast({ title: 'Success', description: 'Password reset link sent! Please check your email.', status: 'success', duration: 5000, isClosable: true });
       setIsSubmitted(true);
     }
     setIsSubmitting(false);
   };
 
   return (
-    <Flex flex="1" minH="80vh" align="center" justify="center" p={4} bg={pageBg}>
-      <Box rounded="xl" bg={boxBg} boxShadow="2xl" p={8} width={{ base: '90%', md: '450px' }} border="1px" borderColor={borderColor}>
-        <Heading fontSize="2xl" mb={2} textAlign="center" color={headingColor}>Forgot Password</Heading>
-        <Text mb={6} textAlign="center" color={textColor}>
-          Enter your email and we'll send you a link to reset your password.
-        </Text>
+    <AuthLayout>
+      <Box rounded="2xl" bg={boxBg} boxShadow="xl" p={{ base: 6, md: 8 }} border="1px" borderColor={borderColor}>
+        <Stack align="center" mb={6}>
+            <Icon as={ShieldCheck} boxSize={10} color={brandColor} />
+            <Heading fontSize="xl" textAlign="center" fontWeight="bold">Recover Command</Heading>
+            <Text textAlign="center" fontSize="sm" color="gray.500">
+            Enter your email to receive a secure reset link.
+            </Text>
+        </Stack>
 
-        {isSubmitted && (
-          <Alert status="success" mb={4} rounded="md">
-            <AlertIcon />
-            If an account with this email exists, a reset link has been sent.
+        {isSubmitted ? (
+          <Alert status="success" variant="subtle" flexDirection="column" alignItems="center" justifyContent="center" textAlign="center" rounded="lg" p={6}>
+            <AlertIcon boxSize="24px" mr={0} />
+            <Text mt={4} mb={2} fontWeight="bold">Transmission Sent</Text>
+            <Text fontSize="sm">Check your inbox for the reset link.</Text>
           </Alert>
+        ) : (
+          <form onSubmit={handleReset}>
+            <Stack spacing={4}>
+              {error && <Alert status="error" rounded="md"><AlertIcon />{error}</Alert>}
+              
+              <FormControl id="email" isRequired>
+                <FormLabel fontSize="sm">Email address</FormLabel>
+                <Input 
+                    type="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    placeholder="pilot@company.com" 
+                    borderColor={borderColor}
+                    focusBorderColor={brandColor}
+                    size="lg"
+                />
+              </FormControl>
+              
+              <Button 
+                width="full" 
+                bg={brandColor} 
+                color="white" 
+                _hover={{ opacity: 0.9 }} 
+                type="submit" 
+                isLoading={isSubmitting} 
+                size="lg"
+                leftIcon={<Icon as={Mail} />}
+              >
+                Send Reset Link
+              </Button>
+            </Stack>
+          </form>
         )}
-        {error && !isSubmitted && (
-          <Alert status="error" mb={4} rounded="md"><AlertIcon />{error}</Alert>
-        )}
-
-        <form onSubmit={handlePasswordReset}>
-          <Stack spacing={4}>
-            <FormControl id="email" isRequired>
-              <FormLabel color={textColor}>Email address</FormLabel>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" borderColor={borderColor} />
-            </FormControl>
-            <Button width="full" bg={brandGold} color={brandGoldText} _hover={{ bg: brandGoldHover }} type="submit" isLoading={isSubmitting} size="lg" shadow="md">
-              Send Reset Link
-            </Button>
-          </Stack>
-        </form>
-        <Text mt={6} textAlign="center">
-          <Link as={NextLink} href="/sign-in" color={brandGold} fontWeight="medium">
-            Back to Sign In
-          </Link>
+        
+        <Text mt={6} textAlign="center" fontSize="sm">
+          <Link as={NextLink} href="/sign-in" color={brandColor} fontWeight="bold">Return to Login</Link>
         </Text>
       </Box>
-    </Flex>
+    </AuthLayout>
   );
 }

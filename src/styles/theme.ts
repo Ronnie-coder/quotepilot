@@ -1,10 +1,6 @@
-// FILE: src/styles/theme.ts (VICTORY CODE)
+// DEFINITIVE REFINEMENT: src/styles/theme.ts
 import { extendTheme, type ThemeConfig } from '@chakra-ui/react';
 
-// --- TACTICAL MODERNIZATION IMPLEMENTED ---
-// The '@chakra-ui/theme-tools' package is deprecated. The 'mode' function it provided
-// is recreated here to maintain theme functionality without the missing dependency.
-// This makes the theme self-reliant and compliant with modern Chakra UI versions.
 const mode = (light: string, dark: string) => (props: { colorMode: 'light' | 'dark' }) => {
   return props.colorMode === 'dark' ? dark : light;
 };
@@ -17,111 +13,63 @@ const config: ThemeConfig = {
 const styles = {
   global: (props: any) => ({
     body: {
-      bg: mode('#FFFFFF', '#000000')(props),
+      bg: mode('gray.50', 'black')(props),
       color: mode('gray.800', 'gray.100')(props),
     },
   }),
 };
 
-const components = {
-  Button: {
-    variants: {
-      solid: (props: any) => ({
-        bg: 'brand.500',
-        color: 'gray.900',
-        _hover: { 
-          bg: 'brand.600',
-          _disabled: {
-            bg: 'brand.500'
-          }
-        },
-      }),
-      outline: (props: any) => ({
-        borderColor: mode('gray.800', 'white')(props),
-        color: mode('gray.800', 'white')(props),
-        _hover: {
-          bg: mode('gray.100', 'whiteAlpha.100')(props),
-        }
-      })
-    },
-  },
-  Card: {
-    baseStyle: (props: any) => ({
-      container: {
-        bg: mode('#FFFFFF', '#1A1A1A')(props),
-      },
-    }),
-  },
-  Input: {
-    variants: {
-      outline: (props: any) => ({
-        field: {
-          bg: mode('white', 'gray.800')(props),
-          borderColor: mode('gray.200', 'gray.600')(props),
-          _hover: {
-            borderColor: mode('gray.300', 'gray.500')(props),
-          },
-        },
-      }),
-    },
-  },
-  Select: {
-    variants: {
-      outline: (props: any) => ({
-        field: {
-          bg: mode('white', 'gray.800')(props),
-          borderColor: mode('gray.200', 'gray.600')(props),
-          _hover: {
-            borderColor: mode('gray.300', 'gray.500')(props),
-          },
-        },
-      }),
-    },
-  },
-  Textarea: {
-    variants: {
-      outline: (props: any) => ({
-        bg: mode('white', 'gray.800')(props),
-        borderColor: mode('gray.200', 'gray.600')(props),
-        _hover: {
-          borderColor: mode('gray.300', 'gray.500')(props),
-        },
-      }),
-    },
-  },
-  Table: {
-    variants: {
-      simple: (props: any) => ({
-        th: {
-          borderColor: mode('gray.200', 'gray.700')(props),
-        },
-        td: {
-          borderColor: mode('gray.200', 'gray.700')(props),
-        },
-      }),
-    },
-  },
-  Link: {
-    baseStyle: (props: any) => ({
-      color: mode('gray.600', 'gray.200')(props),
-      _hover: {
-        textDecoration: 'none',
-        color: 'brand.500',
-      },
-    }),
-  },
-};
-
+// --- STRATEGIC BRAND REALIGNMENT: NEW PALETTE ---
+// The new teal/blue palette is professional, calming, and provides excellent contrast.
 const colors = {
   brand: {
-    50: '#FBF6E1', 100: '#F5E8B8', 200: '#EFDA8E', 300: '#E8CC65', 400: '#E2BF3B',
-    500: '#D4AF37', 600: '#B5952F', 700: '#967B27', 800: '#77611F', 900: '#584717',
+    50: '#E6FFFA',
+    100: '#B2F5EA',
+    200: '#81E6D9',
+    300: '#4FD1C5',
+    400: '#38B2AC',
+    500: '#319795', // Core Brand Color
+    600: '#2C7A7B',
+    700: '#285E61',
+    800: '#234E52',
+    900: '#1D4044',
   },
 };
 
 const fonts = {
   heading: `'Inter', sans-serif`,
   body: `'Inter', sans-serif`,
+};
+
+// Refined component styles to better match the new brand
+const components = {
+  Button: {
+    baseStyle: {
+      fontWeight: 'semibold',
+    },
+    variants: {
+      solid: (props: any) => ({
+        // All solid buttons now default to the primary brand color
+        bg: props.colorScheme === 'brand' ? 'brand.500' : undefined,
+        color: props.colorScheme === 'brand' ? 'white' : undefined,
+        _hover: {
+          bg: props.colorScheme === 'brand' ? 'brand.600' : undefined,
+          _disabled: {
+            bg: 'brand.500',
+          },
+        },
+      }),
+    },
+  },
+  Link: {
+    baseStyle: (props: any) => ({
+      color: 'brand.500', // All links default to brand color
+      _hover: {
+        textDecoration: 'underline',
+        color: 'brand.600',
+      },
+    }),
+  },
 };
 
 const theme = extendTheme({ config, styles, components, colors, fonts });

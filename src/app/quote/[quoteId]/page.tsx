@@ -1,18 +1,24 @@
+// FILE: src/app/quote/[quoteId]/page.tsx (REPLACEMENT)
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { InvoiceForm } from '@/components/InvoiceForm';
 import { notFound, redirect } from 'next/navigation';
-import { Box, Heading, Text, VStack } from '@chakra-ui/react';
+import QuotePageClient from './QuotePageClient'; // Import the new dedicated client component
 
-type EditQuotePageProps = { params: { quoteId: string; } };
+type QuotePageProps = {
+  params: { quoteId: string; };
+  searchParams: { view?: string };
+};
 
-export default async function EditQuotePage({ params }: EditQuotePageProps) {
+// The Server Component now focuses purely on data fetching and delegation.
+// It is clean and has no direct knowledge of icons or complex UI.
+export default async function EditQuotePage({ params, searchParams }: QuotePageProps) {
   const supabase = await createSupabaseServerClient();
-  
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) { redirect('/sign-in'); }
 
+  const isViewing = searchParams.view === 'true';
+
   const [quoteResult, profileResult, clientsResult] = await Promise.all([
-    supabase.from('quotes').select('*').eq('id', params.quoteId).eq('user_id', user.id).single(),
+    supabase.from('quotes').select('*, clients(*)').eq('id', params.quoteId).eq('user_id', user.id).single(),
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('clients').select('*').eq('user_id', user.id)
   ]);
@@ -22,21 +28,22 @@ export default async function EditQuotePage({ params }: EditQuotePageProps) {
   const { data: clients } = clientsResult;
 
   if (quoteError || !quote) {
-    console.error('Error fetching quote for edit:', quoteError);
+    console.error('Error fetching quote for edit/view:', quoteError);
     notFound();
   }
+  
+  const quoteWithClient = {
+    ...quote,
+    clients: Array.isArray(quote.clients) ? quote.clients[0] : quote.clients,
+  };
 
+  // Pass the clean, serializable data as props to the Client Component
   return (
-    <VStack spacing={8} align="stretch">
-       <Box>
-        <Heading as="h1" size="xl">Edit {quote.document_type} #{quote.invoice_number}</Heading>
-        <Text color="gray.500">Modify the details below and save your changes.</Text>
-      </Box>
-      <InvoiceForm 
-        profile={profile} 
-        clients={clients || []} 
-        defaultValues={quote}
-      />
-    </VStack>
+    <QuotePageClient 
+      quote={quoteWithClient as any} 
+      profile={profile} 
+      clients={clients || []} 
+      isViewing={isViewing}
+    />
   );
 }

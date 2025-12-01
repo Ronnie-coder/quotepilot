@@ -1,3 +1,4 @@
+// FILE: src/app/dashboard/page.tsx
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import DashboardClientPage from './DashboardClientPage';
@@ -13,8 +14,14 @@ export default async function DashboardPage() {
     redirect('/sign-in');
   }
 
-  // --- MISSION CRITICAL: Expanding data fetch to include Total Revenue ---
-  const [clientCountResult, quoteCountResult, recentDocumentsResult, totalRevenueResult] = await Promise.all([
+  // --- MISSION CRITICAL: Expanding data fetch for the Actionable Command Center ---
+  const [
+    clientCountResult,
+    quoteCountResult,
+    recentDocumentsResult,
+    totalRevenueResult,
+    overdueInvoicesResult, // Tactical Priority Alpha: Fetching overdue invoices
+  ] = await Promise.all([
     supabase
       .from('clients')
       .select('id', { count: 'exact', head: true })
@@ -25,39 +32,61 @@ export default async function DashboardPage() {
       .eq('user_id', user.id),
     supabase
       .from('quotes')
-      .select(`
+      .select(
+        `
         id,
         document_type,
         invoice_number,
         total,
         created_at,
         clients ( name )
-      `)
+      `
+      )
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5),
-    // NEW QUERY: Fetch the 'total' of all documents for the user
     supabase
       .from('quotes')
       .select('total')
       .eq('user_id', user.id),
+    // NEW QUERY: Fetch invoices that are past their due date and are not marked as 'Paid'
+    supabase
+      .from('quotes')
+      .select(
+        `
+        id,
+        invoice_number,
+        total,
+        due_date,
+        clients ( name )
+      `
+      )
+      .eq('user_id', user.id)
+      .eq('document_type', 'Invoice') // Ensure we only check invoices
+      .neq('status', 'Paid') // Ensure we don't show paid invoices as overdue
+      .lt('due_date', new Date().toISOString()), // Check if due_date is in the past
   ]);
-  
+
   const clientCount = clientCountResult.count ?? 0;
   const quoteCount = quoteCountResult.count ?? 0;
   const recentDocuments = recentDocumentsResult.data ?? [];
+  const overdueInvoices = overdueInvoicesResult.data ?? [];
 
-  // --- COMMANDER'S NOTE: Calculate total revenue from the fetched data ---
-  const totalRevenue = totalRevenueResult.data?.reduce((sum, doc) => sum + (doc.total ?? 0), 0) ?? 0;
+  const totalRevenue =
+    totalRevenueResult.data?.reduce(
+      (sum, doc) => sum + (doc.total ?? 0),
+      0
+    ) ?? 0;
 
   // Pass all fetched data to the client page for rendering
   return (
-    <DashboardClientPage 
-      user={user} 
-      clientCount={clientCount} 
+    <DashboardClientPage
+      user={user}
+      clientCount={clientCount}
       quoteCount={quoteCount}
-      totalRevenue={totalRevenue} // Pass the newly calculated total revenue
+      totalRevenue={totalRevenue}
       recentDocuments={recentDocuments}
+      overdueInvoices={overdueInvoices} // Pass the new overdue invoices data
     />
   );
 }

@@ -1,19 +1,50 @@
-// FILE: src/components/Footer.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Box, Text, VStack, Container, useColorModeValue, Divider, HStack, Link, SimpleGrid, Heading, IconButton, Image } from '@chakra-ui/react';
+import { 
+  Box, 
+  Text, 
+  Container, 
+  useColorModeValue, 
+  Divider, 
+  HStack, 
+  Link, 
+  SimpleGrid, 
+  Heading, 
+  IconButton, 
+  VStack,
+  chakra,
+  shouldForwardProp
+} from '@chakra-ui/react';
+import { keyframes } from '@emotion/react'; 
 import NextLink from 'next/link';
 import { FaGithub, FaLinkedin, FaTwitter } from 'react-icons/fa';
+import { motion, isValidMotionProp } from 'framer-motion';
+import Image from 'next/image';
+import { useState, useEffect } from 'react';
 
-const FooterLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
-  const textColor = useColorModeValue('gray.600', 'gray.400');
+// --- MOTION COMPONENT FACTORY ---
+const MotionBox = chakra(motion.div, {
+  shouldForwardProp: (prop) => isValidMotionProp(prop) || shouldForwardProp(prop),
+});
+
+const FooterLink = ({ href, children, isExternal = false }: { href: string; children: React.ReactNode; isExternal?: boolean }) => {
+  const textColor = useColorModeValue('gray.500', 'gray.400');
+  const hoverColor = useColorModeValue('brand.500', 'brand.300');
+  
   return (
     <Link 
       as={NextLink} 
       href={href} 
       color={textColor} 
-      _hover={{ color: useColorModeValue('yellow.500', 'yellow.300'), textDecoration: 'underline' }}
+      isExternal={isExternal}
+      fontSize="sm"
+      _hover={{ 
+        color: hoverColor, 
+        textDecoration: 'none',
+        transform: 'translateX(2px)' 
+      }}
+      display="inline-block"
+      transition="all 0.2s"
     >
       {children}
     </Link>
@@ -22,10 +53,13 @@ const FooterLink = ({ href, children }: { href: string; children: React.ReactNod
 
 const Footer = () => {
   const textColor = useColorModeValue('gray.500', 'gray.400');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const headingColor = useColorModeValue('gray.700', 'gray.200');
+  const borderColor = useColorModeValue('gray.200', 'gray.800');
   const bgColor = useColorModeValue('gray.50', 'black');
+  const brandColor = useColorModeValue('brand.500', 'brand.300');
+  
+  const logoFilter = useColorModeValue('none', 'drop-shadow(0 0 5px rgba(49, 151, 149, 0.5))');
 
-  // State & Effect for Live Clock
   const [currentTime, setCurrentTime] = useState('');
   useEffect(() => {
     const updateTime = () => {
@@ -36,75 +70,142 @@ const Footer = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Version Identifier
-  const appVersion = "v1.0.0-PROD";
+  const pulse = keyframes`
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(72, 187, 120, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(72, 187, 120, 0); }
+  `;
+
+  const appVersion = "v1.8.0-STABLE";
+
+  // Animation Variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
+  };
 
   return (
     <Box as="footer" width="100%" bg={bgColor} borderTop="1px" borderColor={borderColor}>
-      <Container maxW="container.xl" py={{ base: 8, md: 12 }} px={{ base: 4, md: 8 }}>
-        <VStack spacing={8} align="stretch">
+      <Container maxW="container.xl" py={12} px={{ base: 6, md: 8 }}>
+        <MotionBox 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }}
+          variants={containerVariants}
+        >
           {/* Top Section: Links */}
-          <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} spacing={{ base: 8, md: 10 }}>
+          <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} spacing={8} mb={10}>
+            
+            {/* Column 1: Brand */}
+            <VStack align="flex-start" spacing={4}>
+              {/* FIXED: Removed invalid 'group' prop. Only role="group" remains. */}
+              <HStack as={NextLink} href="/" spacing={3} role="group">
+                <Box filter={logoFilter} transition="transform 0.3s ease" _groupHover={{ transform: 'rotate(-5deg)' }}>
+                  <Image src="/logo.svg" alt="QuotePilot Logo" width={28} height={28} />
+                </Box>
+                <Heading as="h3" size="sm" fontWeight="800" letterSpacing="wide" textTransform="uppercase" color={headingColor}>
+                  QuotePilot
+                </Heading>
+              </HStack>
+              <Text fontSize="sm" color={textColor} lineHeight="relaxed" maxW="xs">
+                Empowering African creators with professional financial tools. Built for speed, designed for growth.
+              </Text>
+            </VStack>
+
+            {/* Column 2: Product */}
             <VStack align="flex-start" spacing={3}>
-              <Heading as="h3" size="md" letterSpacing="wider" textTransform="uppercase">QuotePilot</Heading>
-              <Text fontSize="sm" color={textColor}>The professional invoicing tool for modern African creators, freelancers, and businesses.</Text>
+              <Heading as="h4" size="xs" fontWeight="bold" textTransform="uppercase" letterSpacing="wider" color={headingColor} mb={1}>
+                Platform
+              </Heading>
+              <FooterLink href="/#features">Capabilities</FooterLink>
+              <FooterLink href="/dashboard">Command Center</FooterLink>
+              <FooterLink href="/sign-up">Start Flying</FooterLink>
             </VStack>
-            <VStack align={{ base: 'flex-start' }} spacing={3}>
-              <Heading as="h4" size="sm" color={textColor}>Product</Heading>
-              <FooterLink href="/#features">Features</FooterLink>
-              <FooterLink href="/dashboard">Dashboard</FooterLink>
-            </VStack>
-            <VStack align={{ base: 'flex-start' }} spacing={3}>
-              <Heading as="h4" size="sm" color={textColor}>Legal</Heading>
+
+            {/* Column 3: Legal */}
+            <VStack align="flex-start" spacing={3}>
+              <Heading as="h4" size="xs" fontWeight="bold" textTransform="uppercase" letterSpacing="wider" color={headingColor} mb={1}>
+                Legal
+              </Heading>
               <FooterLink href="/privacy-policy">Privacy Policy</FooterLink>
               <FooterLink href="/terms-of-service">Terms of Service</FooterLink>
             </VStack>
-            <VStack align={{ base: 'flex-start' }} spacing={3}>
-              <Heading as="h4" size="sm" color={textColor}>Contact Us</Heading>
-              <FooterLink href="mailto:ronnie@coderon.co.za">ronnie@coderon.co.za</FooterLink>
-              <FooterLink href="https://www.coderon.co.za">coderon.co.za</FooterLink>
+
+            {/* Column 4: Support */}
+            <VStack align="flex-start" spacing={3}>
+              <Heading as="h4" size="xs" fontWeight="bold" textTransform="uppercase" letterSpacing="wider" color={headingColor} mb={1}>
+                Connect
+              </Heading>
+              <FooterLink href="mailto:info@coderon.co.za">info@coderon.co.za</FooterLink>
+              <FooterLink href="mailto:support@coderon.co.za">support@coderon.co.za</FooterLink>
             </VStack>
           </SimpleGrid>
 
-          <Divider borderColor={borderColor} />
+          <Divider borderColor={borderColor} opacity={0.6} />
 
-          {/* Middle Section: Copyright, Socials, Version */}
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} w="full" alignItems="center">
+          {/* Bottom Section */}
+          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mt={8} alignItems="center">
+            
+            {/* Copyright */}
             <VStack spacing={0} align={{ base: 'center', md: 'flex-start' }}>
-              <Text fontSize="sm" color={textColor}>© {new Date().getFullYear()} Coderon (Pty) Ltd.</Text>
-              <Text fontSize="xs" color={textColor}>Reg: 2025 / 482790 / 07</Text>
+              <Text fontSize="xs" color={textColor}>© {new Date().getFullYear()} Coderon (Pty) Ltd.</Text>
+              <Text fontSize="xs" color={textColor} opacity={0.8}>All rights reserved.</Text>
             </VStack>
             
-            <HStack justify={{ base: 'center', md: 'center' }}>
-              <IconButton as="a" href="https://github.com/Ronnie-coder" target="_blank" rel="noopener noreferrer" aria-label="GitHub" icon={<FaGithub />} variant="ghost" color={textColor} />
-              <IconButton as="a" href="https://x.com/Coderon28" target="_blank" rel="noopener noreferrer" aria-label="Twitter" icon={<FaTwitter />} variant="ghost" color={textColor} />
-              <IconButton as="a" href="https://www.linkedin.com/in/ronnie-nyamhute-8b302b360" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" icon={<FaLinkedin />} variant="ghost" color={textColor} />
+            {/* Socials */}
+            <HStack justify="center" spacing={4}>
+              <IconButton 
+                as="a" 
+                href="https://github.com/Ronnie-coder/quotepilot" 
+                target="_blank" 
+                aria-label="GitHub" 
+                icon={<FaGithub size={18} />} 
+                variant="ghost" 
+                color={textColor} 
+                _hover={{ color: brandColor, bg: 'transparent', transform: 'translateY(-2px)' }} 
+              />
+              <IconButton 
+                as="a" 
+                href="https://x.com/Coderon28" 
+                target="_blank" 
+                aria-label="Twitter" 
+                icon={<FaTwitter size={18} />} 
+                variant="ghost" 
+                color={textColor} 
+                _hover={{ color: brandColor, bg: 'transparent', transform: 'translateY(-2px)' }} 
+              />
+              <IconButton 
+                as="a" 
+                href="https://www.linkedin.com/company/coderon/" 
+                target="_blank" 
+                aria-label="LinkedIn" 
+                icon={<FaLinkedin size={18} />} 
+                variant="ghost" 
+                color={textColor} 
+                _hover={{ color: brandColor, bg: 'transparent', transform: 'translateY(-2px)' }} 
+              />
             </HStack>
 
-            <VStack spacing={0} align={{ base: 'center', md: 'flex-end' }}>
-                <Text fontSize="sm" color={textColor}>{appVersion}</Text>
-                {currentTime && <Text fontSize="xs" color={textColor} aria-label="Current time in Johannesburg">{currentTime} SAST</Text>}
+            {/* System Status */}
+            <VStack spacing={1} align={{ base: 'center', md: 'flex-end' }}>
+                <Text fontSize="xs" color={textColor} fontFamily="mono" opacity={0.7}>{appVersion}</Text>
+                {currentTime && (
+                  <HStack spacing={2} bg={useColorModeValue('white', 'whiteAlpha.100')} px={2} py={1} rounded="md" border="1px solid" borderColor={borderColor}>
+                    <Box 
+                      w={2} 
+                      h={2} 
+                      bg="green.400" 
+                      borderRadius="full" 
+                      animation={`${pulse} 2s infinite`} 
+                    />
+                    <Text fontSize="xs" fontWeight="bold" color={useColorModeValue('gray.600', 'gray.300')}>
+                      {currentTime} SAST
+                    </Text>
+                  </HStack>
+                )}
             </VStack>
           </SimpleGrid>
-          
-          <Divider borderColor={borderColor} />
-
-          {/* Bottom Section: Powered by Coderon */}
-          <VStack spacing={3} pt={4}>
-            <Text fontSize="sm" color={textColor}>Powered by</Text>
-            <Link as={NextLink} href="https://www.coderon.co.za" isExternal>
-              <Image 
-                // CORRECTED: Image source now points to the unique Coderon logo file
-                src="/coderon-logo.svg" 
-                alt="Coderon Logo" 
-                height="40px" 
-                filter={useColorModeValue('none', 'invert(1)')}
-                transition="transform 0.2s ease-in-out"
-                _hover={{ transform: 'scale(1.05)' }}
-              />
-            </Link>
-          </VStack>
-        </VStack>
+        </MotionBox>
       </Container>
     </Box>
   );

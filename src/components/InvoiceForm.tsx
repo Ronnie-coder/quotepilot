@@ -1,12 +1,34 @@
+// FILE: src/components/InvoiceForm.tsx
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { Box, Button, FormControl, FormLabel, Input, VStack, Heading, HStack, IconButton, Text, Switch, Grid, useToast, Textarea, Select, Checkbox, Divider, Flex, Icon, SimpleGrid, useColorModeValue } from '@chakra-ui/react';
-import { Trash2, Plus, Save, Download } from 'lucide-react';
+import {
+  Box,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  VStack,
+  Heading,
+  HStack,
+  IconButton,
+  Text,
+  Switch,
+  Grid,
+  useToast,
+  Textarea,
+  Select,
+  Checkbox,
+  Divider,
+  Icon,
+  SimpleGrid,
+  useColorModeValue,
+} from '@chakra-ui/react';
+import { Trash2, Plus, Save } from 'lucide-react';
 import { Tables } from '@/types/supabase';
 import { InvoiceFormData } from '@/types/invoice';
-import { createQuoteAction, generatePdfAction, updateQuoteAction } from '@/app/dashboard/quotes/actions';
+import { createQuoteAction, updateQuoteAction } from '@/app/dashboard/quotes/actions';
 
 type InvoiceFormProps = {
   profile: Tables<'profiles'> | null;
@@ -14,6 +36,7 @@ type InvoiceFormProps = {
   defaultValues?: Tables<'quotes'> | null;
 };
 
+// --- Sub-Components for clean layout ---
 const FormSection = ({ title, children }: { title: string, children: React.ReactNode }) => {
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -30,12 +53,11 @@ const FormSection = ({ title, children }: { title: string, children: React.React
 export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProps) => {
   const [documentType, setDocumentType] = useState<'Quote' | 'Invoice'>(defaultValues?.document_type === 'Invoice' ? 'Invoice' : 'Quote');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isNewClient, setIsNewClient] = useState(!defaultValues?.client_id && clients?.length > 0);
   const toast = useToast();
   const isEditing = !!defaultValues;
 
-  const { register, control, handleSubmit, watch, setValue, reset } = useForm<InvoiceFormData>({
+  const { register, control, handleSubmit, watch, reset } = useForm<InvoiceFormData>({
     defaultValues: { applyVat: defaultValues ? (defaultValues.vat_rate || 0) > 0 : true }
   });
   
@@ -46,16 +68,12 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   useEffect(() => {
     if (defaultValues) {
       const client = clients.find(c => c.id === defaultValues.client_id);
-      
-      // --- CORRECTIVE ACTION IMPLEMENTED ---
-      // This logic prevents a crash if date values from the DB are null.
-      // It tries invoice_date, falls back to created_at, and finally to today's date.
       const safeDateSource = defaultValues.invoice_date || defaultValues.created_at;
       const invoiceDate = new Date(safeDateSource || new Date()).toISOString().substring(0, 10);
 
       reset({
         invoiceNumber: defaultValues.invoice_number || '',
-        invoiceDate: invoiceDate, // Use the hardened, null-safe date
+        invoiceDate: invoiceDate,
         dueDate: defaultValues.due_date ? new Date(defaultValues.due_date).toISOString().substring(0, 10) : '',
         to: { name: client?.name || 'Client Not Found', email: client?.email || '', address: client?.address || '' },
         lineItems: defaultValues.line_items ? (defaultValues.line_items as any) : [{ description: '', quantity: 1, unitPrice: 0 }],
@@ -87,54 +105,26 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   const onSubmit = async (data: InvoiceFormData) => {
     setIsSubmitting(true);
     try {
-      let result;
       if (isEditing && defaultValues) {
-        result = await updateQuoteAction({
+        await updateQuoteAction({
           quoteId: defaultValues.id, formData: data, documentType: documentType, total: total,
         });
       } else {
-        result = await createQuoteAction({
+        await createQuoteAction({
           formData: data, documentType: documentType, total: total,
         });
       }
-      if (result?.success === false) { throw new Error(result.message); }
-      toast({ title: 'Success!', description: `Your ${documentType} has been saved.`, status: 'success' });
+      toast({ title: 'Success!', description: `Your ${documentType} has been saved. Redirecting...`, status: 'success', duration: 3000, isClosable: true });
     } catch (error: any) {
       toast({ title: 'Operation Failed', description: error.message || `There was an error saving your ${documentType}.`, status: 'error' });
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const handleDownloadPdf = async () => {
-    if (!defaultValues?.id) {
-      toast({ title: 'Cannot Download', description: 'Document must be saved first.', status: 'warning' });
-      return;
-    }
-    
-    setIsDownloading(true);
-    try {
-      const result = await generatePdfAction(defaultValues.id);
-      if (result.success && result.pdfData) {
-        const link = document.createElement('a');
-        link.href = `data:application/pdf;base64,${result.pdfData}`;
-        link.download = result.fileName || `document.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        throw new Error(result.error || 'An unknown PDF error occurred.');
-      }
-    } catch (error) {
-      toast({ title: 'PDF Generation Failed', description: error instanceof Error ? error.message : 'Could not generate the PDF.', status: 'error' });
-    } finally {
-      setIsDownloading(false);
-    }
-  };
   
-  const brandGold = useColorModeValue('yellow.500', 'yellow.300');
+  const primaryColor = useColorModeValue('cyan.500', 'cyan.300');
   const buttonTextColor = useColorModeValue('gray.800', 'gray.900');
-  const focusBorderColor = useColorModeValue('yellow.500', 'yellow.300');
+  const focusBorderColor = useColorModeValue('cyan.500', 'cyan.300');
 
   return (
     <Box as="form" onSubmit={handleSubmit(onSubmit)}>
@@ -155,7 +145,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
                     <FormControl isRequired><Input placeholder="Client Name" {...register('to.name')} focusBorderColor={focusBorderColor} /></FormControl>
                     <FormControl><Input placeholder="Client Email" type="email" {...register('to.email')} focusBorderColor={focusBorderColor} /></FormControl>
                     <FormControl><Textarea placeholder="Client Address" {...register('to.address')} focusBorderColor={focusBorderColor} size="sm" /></FormControl>
-                    {clients?.length > 0 && <Button size="sm" variant="link" colorScheme="yellow" onClick={() => setIsNewClient(false)}>Select Existing</Button>}
+                    {clients?.length > 0 && <Button size="sm" variant="link" colorScheme="cyan" onClick={() => setIsNewClient(false)}>Select Existing</Button>}
                   </VStack>
                 ) : (
                   <VStack spacing={3} mt={1}>
@@ -164,7 +154,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
                         {clients.map(client => <option key={client.id} value={client.name!}>{client.name}</option>)}
                       </Select>
                     </FormControl>
-                    <Button size="sm" variant="link" colorScheme="yellow" onClick={() => setIsNewClient(true)}>+ Add New Client</Button>
+                    <Button size="sm" variant="link" colorScheme="cyan" onClick={() => setIsNewClient(true)}>+ Add New Client</Button>
                   </VStack>
                 )}
               </Box>
@@ -193,7 +183,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
                 </SimpleGrid>
               );
             })}
-            <Button onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })} leftIcon={<Icon as={Plus} />} variant="outline" colorScheme="yellow" alignSelf="flex-start">Add Item</Button>
+            <Button onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })} leftIcon={<Icon as={Plus} />} variant="outline" colorScheme="cyan" alignSelf="flex-start">Add Item</Button>
           </FormSection>
 
           <FormSection title="Notes / Terms">
@@ -206,7 +196,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
           <FormSection title="Document Details">
             <HStack justify="space-between" align="center" p={2} bg={useColorModeValue('gray.50', 'gray.700')} borderRadius="md">
               <Text fontWeight='bold'>Quote</Text>
-              <Switch isChecked={documentType === 'Invoice'} onChange={(e) => setDocumentType(e.target.checked ? 'Invoice' : 'Quote')} colorScheme="yellow" size="lg" />
+              <Switch isChecked={documentType === 'Invoice'} onChange={(e) => setDocumentType(e.target.checked ? 'Invoice' : 'Quote')} colorScheme="cyan" size="lg" />
               <Text fontWeight='bold'>Invoice</Text>
             </HStack>
             <FormControl><FormLabel>Doc #</FormLabel><Input {...register('invoiceNumber')} focusBorderColor={focusBorderColor} /></FormControl>
@@ -218,20 +208,19 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
              <VStack spacing={3} align="stretch">
                 <HStack justify="space-between"><Text color="gray.500">Subtotal</Text><Text>R {subtotal.toFixed(2)}</Text></HStack>
                 <HStack justify="space-between">
-                    <Checkbox {...register('applyVat')} size="md" colorScheme="yellow">
+                    <Checkbox {...register('applyVat')} size="md" colorScheme="cyan">
                         <HStack><Text color="gray.500">VAT</Text><Input size="xs" w="50px" textAlign="center" {...register('vatRate')} focusBorderColor={focusBorderColor} /> <Text color="gray.500">%</Text></HStack>
                     </Checkbox>
                     <Text>R {vatAmount.toFixed(2)}</Text>
                 </HStack>
                 <Divider my={2} />
-                <HStack justify="space-between" fontWeight="bold" fontSize="2xl"><Text>Total</Text><Text color={brandGold}>R {total.toFixed(2)}</Text></HStack>
+                <HStack justify="space-between" fontWeight="bold" fontSize="2xl"><Text>Total</Text><Text color={primaryColor}>R {total.toFixed(2)}</Text></HStack>
             </VStack>
           </FormSection>
 
-          <Flex direction={{ base: 'column-reverse', sm: 'row' }} justify="flex-end" gap={4}>
-            {isEditing && (<Button onClick={handleDownloadPdf} variant="outline" colorScheme="yellow" size="lg" leftIcon={<Icon as={Download}/>} isLoading={isDownloading}>Download</Button>)}
-            <Button type="submit" bg={brandGold} color={buttonTextColor} _hover={{ bg: useColorModeValue('yellow.600', 'yellow.400') }} size="lg" isLoading={isSubmitting} leftIcon={<Icon as={Save} />}>{isEditing ? 'Update' : 'Save'}</Button>
-          </Flex>
+          <Button type="submit" bg={primaryColor} color={buttonTextColor} _hover={{ bg: useColorModeValue('cyan.600', 'cyan.400') }} size="lg" isLoading={isSubmitting} leftIcon={<Icon as={Save} />}>
+            {isEditing ? 'Update Document' : 'Save Document'}
+          </Button>
         </VStack>
       </Grid>
     </Box>

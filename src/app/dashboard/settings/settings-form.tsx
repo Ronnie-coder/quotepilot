@@ -1,8 +1,8 @@
-// src/app/dashboard/settings/settings-form.tsx
+// FILE: src/app/dashboard/settings/settings-form.tsx
 'use client';
 
 import {
-  Box, Button, FormControl, FormLabel, Input, VStack, useToast, Textarea, Heading, HStack, Flex, Grid, GridItem, Icon, useColorModeValue
+  Box, Button, FormControl, FormLabel, Input, VStack, useToast, Textarea, Heading, HStack, Flex, Grid, GridItem, Icon, useColorModeValue, SimpleGrid
 } from '@chakra-ui/react';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,7 +12,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Tables } from '@/types/supabase';
 import { uploadLogoAction } from './actions';
 import LogoUploader from '@/components/LogoUploader';
-import { Building, Banknote, FileText, UploadCloud } from 'lucide-react';
+import { Building, Banknote, FileText, UploadCloud, Save } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 type ProfileWithBanking = Tables<'profiles'> & {
   bank_name?: string | null;
@@ -28,17 +29,51 @@ type SettingsFormProps = {
   profile: ProfileWithBanking | null;
 };
 
-// --- SettingsSection component remains unchanged ---
+// --- ANIMATION VARIANTS ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { duration: 0.5, ease: 'easeOut' },
+  },
+};
+
+// --- SETTINGS SECTION COMPONENT ---
 const SettingsSection = ({ title, icon, children }: { title: string, icon: React.ElementType, children: React.ReactNode }) => {
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const headingColor = useColorModeValue('gray.700', 'white');
+  const headingColor = useColorModeValue('gray.800', 'white');
+  const iconBg = useColorModeValue('cyan.50', 'gray.700');
+  const iconColor = useColorModeValue('cyan.500', 'cyan.300');
 
   return (
-    <Box bg={cardBg} p={{ base: 6, md: 8 }} borderRadius="lg" shadow="md" borderWidth="1px" borderColor={borderColor}>
+    <Box 
+      as={motion.div} 
+      variants={itemVariants}
+      bg={cardBg} 
+      p={{ base: 6, md: 8 }} 
+      borderRadius="xl"
+      shadow="sm" 
+      borderWidth="1px" 
+      borderColor={borderColor}
+      transition="all 0.2s"
+      _hover={{ shadow: 'md' }}
+      h="full"
+    >
       <HStack as="header" spacing={4} mb={6}>
-        <Icon as={icon} boxSize={6} color="gray.400" />
-        <Heading as="h2" size="lg" color={headingColor}>{title}</Heading>
+        <Flex p={2} borderRadius="lg" bg={iconBg} color={iconColor}>
+          <Icon as={icon} boxSize={5} />
+        </Flex>
+        <Heading as="h2" size="md" color={headingColor}>{title}</Heading>
       </HStack>
       <VStack spacing={6} align="stretch">
         {children}
@@ -54,13 +89,16 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const searchParams = useSearchParams();
   const toastShownRef = useRef(false);
   
-  const brandGold = useColorModeValue('yellow.500', 'yellow.300');
-  const buttonTextColor = useColorModeValue('gray.800', 'gray.900');
-  const focusBorderColor = useColorModeValue('yellow.500', 'yellow.300');
+  // --- THEME COLORS (CYAN UNIFICATION) ---
+  const focusBorderColor = useColorModeValue('cyan.500', 'cyan.300');
+  const buttonBg = useColorModeValue('cyan.500', 'cyan.400');
+  const buttonHoverBg = useColorModeValue('cyan.600', 'cyan.500');
+  const buttonText = 'white';
 
   const initialLogoState = { success: false, message: '' };
   const [logoState, logoFormAction] = useFormState(uploadLogoAction, initialLogoState);
 
+  // Logo Upload Toast Logic
   useEffect(() => {
     if (logoState.message) {
       toast({
@@ -74,6 +112,7 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     }
   }, [logoState, toast, router]);
   
+  // Onboarding Toast Logic
   useEffect(() => {
     if (searchParams.get('onboarding') === 'true' && !toastShownRef.current) {
       toastShownRef.current = true;
@@ -89,6 +128,7 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     }
   }, [searchParams, toast, router]);
 
+  // Form Field States
   const [companyName, setCompanyName] = useState(profile?.company_name || '');
   const [companyAddress, setCompanyAddress] = useState(profile?.company_address || '');
   const [companyPhone, setCompanyPhone] = useState(profile?.company_phone || '');
@@ -102,21 +142,28 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const [accountType, setAccountType] = useState(profile?.account_type || '');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Form Submission Logic
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     const payload = {
-      id: user.id, company_name: companyName, company_address: companyAddress,
-      company_phone: companyPhone, vat_number: vatNumber, terms_conditions: terms,
-      bank_name: bankName, account_holder: accountHolder, account_number: accountNumber,
-      branch_code: branchCode, branch_name: branchName, account_type: accountType,
+      id: user.id, 
+      company_name: companyName, 
+      company_address: companyAddress,
+      company_phone: companyPhone, 
+      vat_number: vatNumber, 
+      terms_conditions: terms,
+      bank_name: bankName, 
+      account_holder: accountHolder, 
+      account_number: accountNumber,
+      branch_code: branchCode, 
+      branch_name: branchName, 
+      account_type: accountType,
       updated_at: new Date().toISOString(),
     };
 
-    // --- TACTICAL OVERRIDE IMPLEMENTED ---
-    // We cast the payload to 'any' to bypass the stale, auto-generated Supabase types.
-    // This forces the client to send our correct, complete payload to the database.
+    // Tactical Override: Casting to 'any' to bypass stale Types
     const { error } = await supabase.from('profiles').upsert(payload as any);
 
     if (error) {
@@ -129,18 +176,32 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   };
 
   return (
-    <Box>
+    <Box as={motion.div} variants={containerVariants} initial="hidden" animate="visible">
       <VStack spacing={8} align="stretch">
-        <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={8}>
+        
+        {/* Top Section: Profile & Logo */}
+        <Grid templateColumns={{ base: '1fr', lg: '3fr 2fr' }} gap={8}>
           <GridItem as="form" onSubmit={handleDetailsSubmit}>
-            <VStack spacing={8} align="stretch" h="full">
-                <SettingsSection title="Company Profile" icon={Building}>
-                  <FormControl isRequired><FormLabel>Company Name</FormLabel><Input focusBorderColor={focusBorderColor} value={companyName} onChange={(e) => setCompanyName(e.target.value)} /></FormControl>
-                  <FormControl><FormLabel>Company Address</FormLabel><Input focusBorderColor={focusBorderColor} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} /></FormControl>
-                  <FormControl><FormLabel>Company Phone</FormLabel><Input focusBorderColor={focusBorderColor} value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} /></FormControl>
-                  <FormControl><FormLabel>VAT Number (Optional)</FormLabel><Input focusBorderColor={focusBorderColor} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} /></FormControl>
-                </SettingsSection>
-            </VStack>
+            <SettingsSection title="Company Profile" icon={Building}>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                <FormControl isRequired gridColumn={{ md: 'span 2' }}>
+                  <FormLabel>Company Name</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+                </FormControl>
+                <FormControl gridColumn={{ md: 'span 2' }}>
+                  <FormLabel>Company Address</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Company Phone</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>VAT Number (Optional)</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
+                </FormControl>
+              </SimpleGrid>
+            </SettingsSection>
           </GridItem>
           
           <GridItem>
@@ -148,32 +209,72 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
               <LogoUploader profile={profile} formAction={logoFormAction} state={logoState} />
             </SettingsSection>
           </GridItem>
-
-          <GridItem colSpan={{ base: 1, lg: 2 }}>
-            <Box as="form" onSubmit={handleDetailsSubmit}>
-              <SettingsSection title="Banking & Payment Details" icon={Banknote}>
-                <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
-                  <FormControl><FormLabel>Bank Name</FormLabel><Input focusBorderColor={focusBorderColor} placeholder="e.g. FNB" value={bankName} onChange={(e) => setBankName(e.target.value)} /></FormControl>
-                  <FormControl><FormLabel>Account Holder</FormLabel><Input focusBorderColor={focusBorderColor} placeholder="e.g. Coderon (Pty) Ltd" value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} /></FormControl>
-                  <FormControl><FormLabel>Account Number</FormLabel><Input focusBorderColor={focusBorderColor} value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} /></FormControl>
-                  <FormControl><FormLabel>Account Type</FormLabel><Input focusBorderColor={focusBorderColor} placeholder="e.g. Gold Business Account" value={accountType} onChange={(e) => setAccountType(e.target.value)} /></FormControl>
-                  <FormControl><FormLabel>Branch Code</FormLabel><Input focusBorderColor={focusBorderColor} value={branchCode} onChange={(e) => setBranchCode(e.target.value)} /></FormControl>
-                  <FormControl><FormLabel>Branch Name</FormLabel><Input focusBorderColor={focusBorderColor} value={branchName} onChange={(e) => setBranchName(e.target.value)} /></FormControl>
-                </Grid>
-              </SettingsSection>
-              
-              <SettingsSection title="Terms & Conditions" icon={FileText}>
-                <FormControl><FormLabel>Default Terms & Conditions</FormLabel><Textarea focusBorderColor={focusBorderColor} value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="e.g., Payment due within 30 days." rows={5} /></FormControl>
-              </SettingsSection>
-
-              <Flex justify="flex-end" mt={8}>
-                <Button type="submit" size="lg" isLoading={isLoading} bg={brandGold} color={buttonTextColor} _hover={{ bg: useColorModeValue('yellow.600', 'yellow.400') }}>
-                  Save All Settings
-                </Button>
-              </Flex>
-            </Box>
-          </GridItem>
         </Grid>
+
+        {/* Bottom Section: Banking & Terms */}
+        <Box as="form" onSubmit={handleDetailsSubmit}>
+          <VStack spacing={8} align="stretch">
+            <SettingsSection title="Banking & Payment Details" icon={Banknote}>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                <FormControl>
+                  <FormLabel>Bank Name</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} placeholder="e.g. FNB" value={bankName} onChange={(e) => setBankName(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Account Holder</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} placeholder="e.g. Coderon (Pty) Ltd" value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Account Number</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Account Type</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} placeholder="e.g. Current Account" value={accountType} onChange={(e) => setAccountType(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Branch Code</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} value={branchCode} onChange={(e) => setBranchCode(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Branch Name</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} value={branchName} onChange={(e) => setBranchName(e.target.value)} />
+                </FormControl>
+              </SimpleGrid>
+            </SettingsSection>
+            
+            <SettingsSection title="Terms & Conditions" icon={FileText}>
+              <FormControl>
+                <FormLabel>Default Footer Text</FormLabel>
+                <Textarea 
+                  focusBorderColor={focusBorderColor} 
+                  value={terms} 
+                  onChange={(e) => setTerms(e.target.value)} 
+                  placeholder="e.g., Payment due within 30 days. Banking details above." 
+                  rows={4} 
+                  resize="none"
+                />
+              </FormControl>
+            </SettingsSection>
+
+            {/* Save Button */}
+            <Flex justify="flex-end" pt={4}>
+              <Button 
+                type="submit" 
+                size="lg" 
+                isLoading={isLoading} 
+                bg={buttonBg} 
+                color={buttonText} 
+                leftIcon={<Icon as={Save} />}
+                _hover={{ bg: buttonHoverBg, transform: 'translateY(-2px)', shadow: 'md' }}
+                transition="all 0.2s"
+              >
+                Save All Settings
+              </Button>
+            </Flex>
+          </VStack>
+        </Box>
+
       </VStack>
     </Box>
   );

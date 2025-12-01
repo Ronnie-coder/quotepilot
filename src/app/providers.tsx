@@ -1,4 +1,4 @@
-// FILE: src/app/providers.tsx (COMPLETE & UPGRADED)
+// DEFINITIVE REFINEMENT: src/app/providers.tsx
 'use client';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -9,7 +9,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ChakraProvider theme={theme}>
       <NextTopLoader
-        color="#D4AF37" // TACTICAL UPGRADE: Synced with brand.500 gold
+        color="#319795" // TACTICAL UPGRADE: Synced with new brand.500
         initialPosition={0.08}
         crawlSpeed={200}
         height={4}

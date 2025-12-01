@@ -1,12 +1,12 @@
-// FILE: src/app/update-password/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { Box, Button, Flex, FormControl, FormLabel, Input, Heading, Text, Link, Alert, AlertIcon, useColorModeValue, Stack, useToast, Spinner, VStack, InputGroup, InputRightElement } from '@chakra-ui/react';
+import { Box, Button, FormControl, FormLabel, Input, Heading, Text, Link, Alert, AlertIcon, useColorModeValue, Stack, useToast, Spinner, VStack, InputGroup, InputRightElement } from '@chakra-ui/react';
 import NextLink from 'next/link';
-import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { Eye, EyeOff } from 'lucide-react'; // FIXED: Consistent Icons
+import { AuthLayout } from '@/components/AuthLayout';
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -19,17 +19,14 @@ export default function UpdatePasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
-  const [showNewPassword, setShowNewPassword] = useState(false); // [NEW] State for new password
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // [NEW] State for confirm password
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const pageBg = useColorModeValue('gray.100', 'gray.900');
-  const boxBg = useColorModeValue('white', 'gray.800');
+  const boxBg = useColorModeValue('white', 'gray.900');
   const headingColor = useColorModeValue('gray.800', 'white');
   const textColor = useColorModeValue('gray.600', 'gray.400');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const brandGold = useColorModeValue('yellow.500', 'yellow.300');
-  const brandGoldText = useColorModeValue('gray.800', 'gray.900');
-  const brandGoldHover = useColorModeValue('yellow.600', 'yellow.400');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const brandColor = useColorModeValue('brand.600', 'brand.400');
 
   useEffect(() => {
     const checkSession = async () => {
@@ -62,7 +59,7 @@ export default function UpdatePasswordPage() {
       toast({ title: 'Error', description: error.message, status: 'error', duration: 5000, isClosable: true });
       setError(error.message);
     } else {
-      toast({ title: 'Success!', description: 'Your password has been updated. You will be redirected to sign in.', status: 'success', duration: 5000, isClosable: true });
+      toast({ title: 'Success!', description: 'Your password has been updated. Redirecting...', status: 'success', duration: 5000, isClosable: true });
       setTimeout(() => router.push('/sign-in'), 2000);
     }
     setIsLoading(false);
@@ -70,27 +67,37 @@ export default function UpdatePasswordPage() {
 
   if (isVerifying) {
     return (
-      <Flex flex="1" minH="80vh" align="center" justify="center" p={4} bg={pageBg}>
+      <AuthLayout>
         <VStack spacing={4}>
-          <Spinner size="xl" color={brandGold} />
-          <Text color={textColor}>Verifying your request...</Text>
+          <Spinner size="xl" color={brandColor} thickness="4px" />
+          <Text color={textColor} fontWeight="medium">Verifying security token...</Text>
         </VStack>
-      </Flex>
+      </AuthLayout>
     );
   }
 
   return (
-    <Flex flex="1" minH="80vh" align="center" justify="center" p={4} bg={pageBg}>
-      <Box rounded="xl" bg={boxBg} boxShadow="2xl" p={8} width={{ base: '90%', md: '450px' }} border="1px" borderColor={borderColor}>
-        <Heading fontSize="2xl" mb={6} textAlign="center" color={headingColor}>Update Your Password</Heading>
+    <AuthLayout>
+      <Box 
+        rounded="2xl" 
+        bg={boxBg} 
+        boxShadow="2xl" 
+        p={{ base: 6, md: 8 }} 
+        width={{ base: 'full', md: '450px' }} 
+        border="1px" 
+        borderColor={borderColor}
+      >
+        <Heading fontSize="xl" mb={6} textAlign="center" color={headingColor} fontWeight="bold">
+          Set New Password
+        </Heading>
+        
         {error ? (
-          <Alert status="error" mb={4} rounded="md"><AlertIcon />{error}</Alert>
+          <Alert status="error" variant="subtle" mb={6} rounded="md"><AlertIcon />{error}</Alert>
         ) : (
           <form onSubmit={handleUpdatePassword}>
-            <Stack spacing={4}>
-              {/* [UPGRADE] New Password input now has a visibility toggle */}
+            <Stack spacing={5}>
               <FormControl id="new-password" isRequired>
-                <FormLabel color={textColor}>New Password</FormLabel>
+                <FormLabel fontSize="sm" color={textColor}>New Password</FormLabel>
                 <InputGroup size="md">
                   <Input
                     type={showNewPassword ? 'text' : 'password'}
@@ -102,14 +109,14 @@ export default function UpdatePasswordPage() {
                   />
                   <InputRightElement width="3rem">
                     <Button h="1.75rem" size="sm" onClick={() => setShowNewPassword(!showNewPassword)} variant="ghost">
-                      {showNewPassword ? <FiEyeOff /> : <FiEye />}
+                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </Button>
                   </InputRightElement>
                 </InputGroup>
               </FormControl>
-              {/* [UPGRADE] Confirm Password input now has a visibility toggle */}
+              
               <FormControl id="confirm-password" isRequired>
-                <FormLabel color={textColor}>Confirm New Password</FormLabel>
+                <FormLabel fontSize="sm" color={textColor}>Confirm Password</FormLabel>
                 <InputGroup size="md">
                   <Input
                     type={showConfirmPassword ? 'text' : 'password'}
@@ -121,23 +128,32 @@ export default function UpdatePasswordPage() {
                   />
                   <InputRightElement width="3rem">
                     <Button h="1.75rem" size="sm" onClick={() => setShowConfirmPassword(!showConfirmPassword)} variant="ghost">
-                      {showConfirmPassword ? <FiEyeOff /> : <FiEye />}
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </Button>
                   </InputRightElement>
                 </InputGroup>
               </FormControl>
-              <Button width="full" bg={brandGold} color={brandGoldText} _hover={{ bg: brandGoldHover }} type="submit" isLoading={isLoading} size="lg" mt={2} shadow="md">
+
+              <Button 
+                width="full" 
+                colorScheme="brand" 
+                type="submit" 
+                isLoading={isLoading} 
+                size="lg" 
+                mt={2} 
+                shadow="md"
+              >
                 Update Password
               </Button>
             </Stack>
           </form>
         )}
-         <Text mt={6} textAlign="center">
-          <Link as={NextLink} href="/sign-in" color={brandGold} fontWeight="bold">
+         <Text mt={6} textAlign="center" fontSize="sm">
+          <Link as={NextLink} href="/sign-in" color={brandColor} fontWeight="bold">
             Back to Sign In
           </Link>
         </Text>
       </Box>
-    </Flex>
+    </AuthLayout>
   );
 }
