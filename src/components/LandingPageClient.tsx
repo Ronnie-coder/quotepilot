@@ -243,7 +243,8 @@ export default function LandingPageClient() {
               <Box 
                 className="hero-animate" 
                 mt={16} 
-                perspective="1000px" 
+                // FIX APPLIED: Moved perspective into sx prop
+                sx={{ perspective: '1000px' }}
               >
                  <Box
                     ref={floatCardRef}
