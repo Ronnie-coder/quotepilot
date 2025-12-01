@@ -1,4 +1,3 @@
-// FILE: src/components/EditClientModal.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -57,9 +56,9 @@ export default function EditClientModal({ isOpen, onClose, client, onClientUpdat
       address,
     };
 
-    const { data, error } = await supabase
-      .from('clients')
-      .update(payload as any)
+    // FIX APPLIED: Cast the table selection to 'any' to bypass the 'never' type restriction on update()
+    const { data, error } = await (supabase.from('clients') as any)
+      .update(payload)
       .eq('id', client.id)
       .select()
       .single();
