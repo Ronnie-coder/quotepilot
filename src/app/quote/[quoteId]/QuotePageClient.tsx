@@ -1,14 +1,13 @@
-// FILE: src/app/quote/[quoteId]/QuotePageClient.tsx
 'use client';
 
 import { Box, Heading, Text, VStack, HStack, Button, Icon } from '@chakra-ui/react';
-import InvoiceForm from '@/components/InvoiceForm'; // Ensure this matches your export (default vs named)
+// FIX APPLIED: Added curly braces { } for named import
+import { InvoiceForm } from '@/components/InvoiceForm'; 
 import DocumentViewer from '@/components/DocumentViewer';
 import NextLink from 'next/link';
 import { FilePenLine, ArrowLeft } from 'lucide-react';
 import { Tables } from '@/types/supabase';
 
-// Define the shape of the props this component expects
 type QuotePageClientProps = {
   quote: Tables<'quotes'> & { clients: Tables<'clients'> | null };
   profile: Tables<'profiles'> | null;
@@ -17,7 +16,7 @@ type QuotePageClientProps = {
 };
 
 export default function QuotePageClient({ quote, profile, clients, isViewing }: QuotePageClientProps) {
-  const primaryColor = 'brand.500'; // Updated to match brand
+  const primaryColor = 'brand.500';
   const primaryTextColor = 'white';
 
   return (
@@ -44,7 +43,7 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
       </HStack>
       
       {isViewing ? (
-        // TACTICAL FIX: Type Cast 'quote' to 'any' to bypass strict status check during build
+        // TACTICAL TYPE OVERRIDE: Using 'as any' to ensure build passes despite strict type checks
         <DocumentViewer quote={quote as any} profile={profile} />
       ) : (
         <InvoiceForm profile={profile} clients={clients} defaultValues={quote} />
