@@ -36,8 +36,7 @@ import {
   MenuDivider,
   MenuGroup,
   chakra,
-  Tooltip,
-  FlexProps // Import FlexProps to help with typing if needed, though chakra factory handles most
+  Tooltip
 } from '@chakra-ui/react';
 import { 
   Plus, 
@@ -48,7 +47,6 @@ import {
   Search, 
   X, 
   CheckCircle2, 
-  Clock, 
   AlertCircle, 
   Send,
   FileText
@@ -81,7 +79,6 @@ interface QuotesClientPageProps {
 }
 
 // // 2.0 ANIMATION FACTORY
-// Wraps Motion components to prevent Chakra prop leakage warnings
 const MotionBox = chakra(motion.div, {
   shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
 });
@@ -90,7 +87,6 @@ const MotionTr = chakra(motion.tr, {
   shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
 });
 
-// FIX: Added MotionFlex to handle the animated header correctly
 const MotionFlex = chakra(motion.div, {
   shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
 });
@@ -184,8 +180,6 @@ export default function QuotesClientPage({
     if (currentDoc?.status === newStatus) return;
 
     setUpdatingStatusId(documentId);
-    
-    // Optimistic Update
     setDocuments(docs => docs.map(doc => doc.id === documentId ? { ...doc, status: newStatus } : doc));
 
     const result = await updateDocumentStatusAction(documentId, newStatus);
@@ -221,8 +215,7 @@ export default function QuotesClientPage({
 
   return (
     <MotionBox variants={containerVariants} initial="hidden" animate="visible">
-      
-      {/* 1. HEADER SECTION (FIXED: Using MotionFlex) */}
+      {/* 1. HEADER */}
       <MotionFlex 
         variants={itemVariants} 
         display="flex"
@@ -251,7 +244,7 @@ export default function QuotesClientPage({
         </Button>
       </MotionFlex>
       
-      {/* 2. CONTROLS SECTION */}
+      {/* 2. CONTROLS */}
       <VStack as={motion.div} variants={itemVariants} spacing={4} align="stretch" mb={6}>
         <Flex direction={{ base: 'column', md: 'row' }} gap={4}>
           <InputGroup maxW={{ md: '350px' }}>
@@ -287,8 +280,7 @@ export default function QuotesClientPage({
             value={searchParams.get('status') || ''} 
             onChange={(e) => handleFilterChange('status', e.target.value)}
           >
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
+            <option value="draft">Draft</option            <option value="sent">Sent</option>
             <option value="paid">Paid</option>
             <option value="overdue">Overdue</option>
           </Select>
@@ -413,13 +405,13 @@ const DocumentRow = ({
     day: 'numeric', 
     month: 'short', 
     year: 'numeric' 
-    });
+  });
 
   return (
     <MotionTr 
       variants={itemVariants} 
-      _hover={{ bg: rowHoverBg }} 
-      transition={{ duration: 0.2 }}
+      _hover={{ bg: rowHoverBg }}
+      /* FIXED: Removed the conflicting 'transition' prop here */
     >
       {/* STATUS */}
       <Td>
