@@ -57,7 +57,7 @@ import { DeleteButton } from './DeleteButton';
 import { updateDocumentStatusAction, generatePdfAction } from './actions';
 import { motion, isValidMotionProp } from 'framer-motion';
 
-// // 1.0 TYPE DEFINITIONS
+// --- 1.0 TYPE DEFINITIONS ---
 type DocumentStatus = 'draft' | 'sent' | 'paid' | 'overdue';
 type DocumentType = 'Quote' | 'Invoice';
 
@@ -78,7 +78,8 @@ interface QuotesClientPageProps {
   limit: number;
 }
 
-// // 2.0 ANIMATION FACTORY
+// --- 2.0 ANIMATION COMPONENT FACTORY ---
+// We wrap motion components to prevent Chakra UI from stripping props
 const MotionBox = chakra(motion.div, {
   shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
 });
@@ -101,7 +102,7 @@ const itemVariants = {
   visible: { y: 0, opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } },
 };
 
-// // 3.0 HELPER FUNCTIONS
+// --- 3.0 HELPER FUNCTIONS ---
 function debounce(func: (...args: any[]) => void, delay: number) {
   let timeoutId: NodeJS.Timeout;
   return (...args: any[]) => {
@@ -110,25 +111,26 @@ function debounce(func: (...args: any[]) => void, delay: number) {
   };
 }
 
+// --- 4.0 MAIN COMPONENT ---
 export default function QuotesClientPage({
   initialDocuments,
   count,
   page,
   limit,
 }: QuotesClientPageProps) {
-  // --- STATE ---
+  // STATE
   const [documents, setDocuments] = useState<Document[]>(initialDocuments);
   const [loadingPdfId, setLoadingPdfId] = useState<string | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // --- HOOKS ---
+  // HOOKS
   const toast = useToast();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // --- THEME TOKENS ---
+  // THEME
   const brandColor = 'brand.500';
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -136,7 +138,7 @@ export default function QuotesClientPage({
   const mutedText = useColorModeValue('gray.500', 'gray.400');
   const rowHoverBg = useColorModeValue('gray.50', 'gray.700');
 
-  // --- EFFECTS ---
+  // EFFECTS
   useEffect(() => {
     setDocuments(initialDocuments);
   }, [initialDocuments]);
@@ -146,7 +148,7 @@ export default function QuotesClientPage({
     if (q) setSearchQuery(q);
   }, [searchParams]);
 
-  // --- FILTERS & SEARCH ---
+  // HANDLERS
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
@@ -174,7 +176,6 @@ export default function QuotesClientPage({
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  // --- ACTIONS ---
   const handleStatusUpdate = async (documentId: string, newStatus: string) => {
     const currentDoc = documents.find(d => d.id === documentId);
     if (currentDoc?.status === newStatus) return;
@@ -280,7 +281,8 @@ export default function QuotesClientPage({
             value={searchParams.get('status') || ''} 
             onChange={(e) => handleFilterChange('status', e.target.value)}
           >
-            <option value="draft">Draft</option            <option value="sent">Sent</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
             <option value="paid">Paid</option>
             <option value="overdue">Overdue</option>
           </Select>
@@ -300,7 +302,7 @@ export default function QuotesClientPage({
         </Flex>
       </VStack>
 
-      {/* 3. TABLE SECTION */}
+      {/* 3. TABLE */}
       <Box as={motion.div} variants={itemVariants} bg={cardBg} borderRadius="xl" shadow="sm" borderWidth="1px" borderColor={borderColor} overflow="hidden">
         <TableContainer>
           <Table variant="simple">
@@ -355,7 +357,7 @@ export default function QuotesClientPage({
           <HStack>
             <Button onClick={() => handlePageChange(page - 1)} isDisabled={page <= 1} size="sm" variant="outline">Previous</Button>
             <Text fontSize="sm" fontWeight="bold">Page {page} of {totalPages}</Text>
-            <Button onClick={() => handlePageChange(page + 1)} isDisabled={page >= totalPages} size="sm" variant="outline">Next</Button>
+                        <Button onClick={() => handlePageChange(page + 1)} isDisabled={page >= totalPages} size="sm" variant="outline">Next</Button>
           </HStack>
         </Flex>
       }
@@ -411,7 +413,7 @@ const DocumentRow = ({
     <MotionTr 
       variants={itemVariants} 
       _hover={{ bg: rowHoverBg }}
-      /* FIXED: Removed the conflicting 'transition' prop here */
+      // Note: 'transition' prop removed here to prevent Type Error. Animation is handled by 'variants'.
     >
       {/* STATUS */}
       <Td>
