@@ -1,11 +1,15 @@
-// FILE: src/components/DocumentViewer.tsx (NEW FILE)
 'use client';
 
 import { Tables } from '@/types/supabase';
 import { Box, Heading, Text, VStack, HStack, Divider, SimpleGrid, useColorModeValue, Tag } from '@chakra-ui/react';
 
+// --- THE FIX: Extended Type Definition ---
+// We manually add 'status' to the type because Supabase types might lag behind or handle enums differently.
 type DocumentViewerProps = {
-  quote: Tables<'quotes'> & { clients: Tables<'clients'> | null };
+  quote: Tables<'quotes'> & { 
+    clients: Tables<'clients'> | null;
+    status: string | null; // Explicitly adding status here
+  };
   profile: Tables<'profiles'> | null;
 };
 
@@ -34,13 +38,22 @@ const DetailItem = ({ label, value }: { label: string, value: string | React.Rea
 
 export default function DocumentViewer({ quote, profile }: DocumentViewerProps) {
   const textColor = useColorModeValue('gray.600', 'gray.400');
-  const primaryColor = useColorModeValue('cyan.500', 'cyan.300');
+  const primaryColor = useColorModeValue('brand.500', 'brand.300'); // Updated to use Brand Color
   const lineItems = (quote.line_items as any[] || []);
 
   const subtotal = lineItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0);
   const vatAmount = subtotal * ((quote.vat_rate || 0) / 100);
 
   const formatDate = (dateString: string | null) => dateString ? new Date(dateString).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A';
+
+  // Helper to determine status color safely
+  const getStatusColor = (status: string | null) => {
+    const s = (status || 'draft').toLowerCase();
+    if (s === 'paid') return 'green';
+    if (s === 'overdue') return 'red';
+    if (s === 'sent') return 'blue';
+    return 'gray';
+  };
 
   return (
     <SimpleGrid columns={{ base: 1, lg: 3 }} gap={8} alignItems="start">
@@ -96,7 +109,7 @@ export default function DocumentViewer({ quote, profile }: DocumentViewerProps) 
           <VStack spacing={4} align="stretch">
             <HStack justify="space-between">
               <DetailItem label="Document #" value={`#${quote.invoice_number}`} />
-              <Tag colorScheme={quote.status === 'Paid' ? 'green' : quote.status === 'Overdue' ? 'red' : 'gray'} size="lg" textTransform="capitalize">{quote.status || 'Draft'}</Tag>
+              <Tag colorScheme={getStatusColor(quote.status)} size="lg" textTransform="capitalize">{quote.status || 'Draft'}</Tag>
             </HStack>
             <DetailItem label="Date Issued" value={formatDate(quote.invoice_date)} />
             {quote.document_type === 'Invoice' && <DetailItem label="Due Date" value={formatDate(quote.due_date)} />}
