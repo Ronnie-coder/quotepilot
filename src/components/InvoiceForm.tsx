@@ -32,9 +32,25 @@ import { InvoiceFormData } from '@/types/invoice';
 import { createQuoteAction, updateQuoteAction } from '@/app/dashboard/quotes/actions';
 import { generatePdf } from '@/utils/pdfGenerator'; 
 
-// 🟢 COMMANDER FIX: Added 'email' to ExtendedProfile to resolve build error
+// 🟢 COMMANDER FIX: Comprehensively extend the profile type to include ALL potential missing fields
+// This prevents "Property does not exist" errors for banking and contact details.
 type ExtendedClient = Tables<'clients'> & { currency?: string };
-type ExtendedProfile = Tables<'profiles'> & { currency?: string; email?: string };
+type ExtendedProfile = Tables<'profiles'> & { 
+    currency?: string; 
+    email?: string;
+    // Banking details
+    bank_name?: string;
+    account_holder?: string;
+    account_number?: string;
+    branch_code?: string;
+    branch_name?: string;
+    account_type?: string;
+    // Company details
+    logo_url?: string;
+    company_name?: string;
+    company_address?: string;
+    terms_conditions?: string;
+};
 
 type InvoiceFormProps = {
   profile: ExtendedProfile | null;
@@ -176,7 +192,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         currency: activeCurrency, 
         from: {
           name: profile?.company_name,
-          // 🟢 COMMANDER FIX: Now TS knows 'email' is optional on ExtendedProfile
           email: profile?.email,
           address: profile?.company_address,
         },
@@ -192,10 +207,14 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         vatAmount,
         total,
         payment: {
+            // 🟢 COMMANDER FIX: Accessing banking details is now safe via ExtendedProfile
             bankName: profile?.bank_name,
             accountHolder: profile?.account_holder,
             accNumber: profile?.account_number,
-            branchCode: profile?.branch_code
+            branchCode: profile?.branch_code,
+            // Including others just in case the PDF generator uses them later
+            accountType: profile?.account_type, 
+            branchName: profile?.branch_name
         }
       });
 
@@ -368,7 +387,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
             <VStack spacing={4}>
                 <FormControl><FormLabel fontSize="sm">Document #</FormLabel><Input {...register('invoiceNumber')} focusBorderColor={focusBorderColor} /></FormControl>
                 <FormControl isRequired><FormLabel fontSize="sm">Date Issued</FormLabel><Input type="date" {...register('invoiceDate')} focusBorderColor={focusBorderColor} /></FormControl>
-                                {documentType === 'Invoice' && (
+                {documentType === 'Invoice' && (
                     <FormControl><FormLabel fontSize="sm" color="orange.500">Due Date</FormLabel><Input type="date" {...register('dueDate')} focusBorderColor="orange.500" borderColor="orange.200" /></FormControl>
                 )}
             </VStack>
@@ -407,4 +426,3 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     </Box>
   );
 };
-              
