@@ -278,7 +278,8 @@ export default function LandingPageClient() {
                     mx="auto"
                     position="relative"
                     textAlign="left"
-                    transformStyle="preserve-3d"
+                    // 🟢 COMMANDER FIX: Move CSS property to style prop
+                    style={{ transformStyle: 'preserve-3d' }} 
                  >
                     {/* Fake Invoice UI */}
                     <Flex justify="space-between" align="center" mb={4}>
