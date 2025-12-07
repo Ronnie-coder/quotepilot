@@ -19,15 +19,23 @@ export default async function DashboardPage() {
   const { count: quoteCount } = await supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
 
   // 3. Fetch Recent Activity
-  const { data: recentDocuments } = await supabase
+  const { data: rawRecentDocuments } = await supabase
     .from('quotes')
     .select('id, invoice_number, total, status, document_type, currency, created_at, clients(name)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(5);
 
+  // TRANSFORM 1: Normalize clients array to object for Recent Activity
+  const recentDocuments = rawRecentDocuments?.map((doc) => ({
+    ...doc,
+    clients: Array.isArray(doc.clients) && doc.clients.length > 0 
+      ? doc.clients[0] 
+      : { name: 'Unknown' }
+  })) || [];
+
   // 4. Fetch Overdue List (Action Required)
-  const { data: overdueInvoices } = await supabase
+  const { data: rawOverdueInvoices } = await supabase
     .from('quotes')
     .select('id, invoice_number, total, due_date, currency, clients(name)')
     .eq('user_id', user.id)
@@ -35,6 +43,15 @@ export default async function DashboardPage() {
     .neq('status', 'paid') 
     .neq('status', 'draft') 
     .limit(10);
+
+  // TRANSFORM 2: Normalize clients array to object for Overdue Invoices
+  // This fixes the build error: Type '{ name: any; }[]' is not assignable to type '{ name: string; }'
+  const overdueInvoices = rawOverdueInvoices?.map((inv) => ({
+    ...inv,
+    clients: Array.isArray(inv.clients) && inv.clients.length > 0 
+      ? inv.clients[0] 
+      : { name: 'Unknown' }
+  })) || [];
 
   // 5. Total Revenue
   const { data: paidInvoices } = await supabase
@@ -95,8 +112,8 @@ export default async function DashboardPage() {
       clientCount={clientCount || 0}
       quoteCount={quoteCount || 0}
       totalRevenue={totalRevenue}
-      recentDocuments={recentDocuments || []}
-      overdueInvoices={overdueInvoices || []}
+      recentDocuments={recentDocuments}
+      overdueInvoices={overdueInvoices}
       revenueData={revenueData}
       statusData={statusData}
       currency={systemCurrency}
