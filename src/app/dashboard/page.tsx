@@ -26,15 +26,22 @@ export default async function DashboardPage() {
     .order('created_at', { ascending: false })
     .limit(5);
 
-  // TRANSFORM 1: Normalize clients array to object for Recent Activity
+  // Helper to extract client name safely regardless of array vs object
+  const getClientName = (clientData: any) => {
+    if (!clientData) return 'Unknown';
+    if (Array.isArray(clientData)) {
+        return clientData[0]?.name || 'Unknown';
+    }
+    return clientData?.name || 'Unknown';
+  };
+
+  // TRANSFORM 1: Normalize clients for Recent Activity
   const recentDocuments = rawRecentDocuments?.map((doc) => ({
     ...doc,
-    clients: Array.isArray(doc.clients) && doc.clients.length > 0 
-      ? doc.clients[0] 
-      : { name: 'Unknown' }
+    clients: { name: getClientName(doc.clients) }
   })) || [];
 
-  // 4. Fetch Overdue List (Action Required)
+  // 4. Fetch Overdue List
   const { data: rawOverdueInvoices } = await supabase
     .from('quotes')
     .select('id, invoice_number, total, due_date, currency, clients(name)')
@@ -44,13 +51,10 @@ export default async function DashboardPage() {
     .neq('status', 'draft') 
     .limit(10);
 
-  // TRANSFORM 2: Normalize clients array to object for Overdue Invoices
-  // This fixes the build error: Type '{ name: any; }[]' is not assignable to type '{ name: string; }'
+  // TRANSFORM 2: Normalize clients for Overdue Invoices
   const overdueInvoices = rawOverdueInvoices?.map((inv) => ({
     ...inv,
-    clients: Array.isArray(inv.clients) && inv.clients.length > 0 
-      ? inv.clients[0] 
-      : { name: 'Unknown' }
+    clients: { name: getClientName(inv.clients) }
   })) || [];
 
   // 5. Total Revenue
@@ -76,8 +80,7 @@ export default async function DashboardPage() {
     if (point) point.value += inv.total;
   });
 
-  // 7. Invoice Health (🟢 COMMANDER FIX: LOGIC UPGRADE)
-  // We now fetch status AND due_date to determine true health
+  // 7. Invoice Health Logic
   const { data: allDocs } = await supabase
     .from('quotes')
     .select('status, due_date')
@@ -89,8 +92,7 @@ export default async function DashboardPage() {
   allDocs?.forEach((doc) => {
     let s = doc.status ? doc.status.toLowerCase() : 'draft';
 
-    // LOGIC CHECK:
-    // If it's NOT paid, and NOT draft, and the Date is passed... it is OVERDUE.
+    // LOGIC CHECK: If it's NOT paid, NOT draft, and the Date is passed... it is OVERDUE.
     if (s !== 'paid' && s !== 'draft' && doc.due_date && new Date(doc.due_date) < now) {
       s = 'overdue';
     }
@@ -98,7 +100,7 @@ export default async function DashboardPage() {
     // Capitalize for the chart key
     const key = s.charAt(0).toUpperCase() + s.slice(1);
     
-    // Add to tally if key exists, otherwise ignore (or map to Draft)
+    // Add to tally if key exists, otherwise ignore
     if (key in statusCounts) {
         statusCounts[key as keyof typeof statusCounts]++;
     }

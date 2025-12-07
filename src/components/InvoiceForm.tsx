@@ -61,8 +61,8 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isNewClient, setIsNewClient] = useState(!defaultValues?.client_id && clients?.length > 0);
   
-  // Default to profile currency if no client selected
-  const [activeCurrency, setActiveCurrency] = useState(defaultValues?.currency || profile?.currency || 'ZAR');
+  // 🟢 COMMANDER FIX: Cast defaultValues to any to avoid "property currency does not exist" error
+  const [activeCurrency, setActiveCurrency] = useState((defaultValues as any)?.currency || profile?.currency || 'ZAR');
 
   const toast = useToast();
   const isEditing = !!defaultValues;
@@ -83,7 +83,8 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
 
   // --- DYNAMIC CURRENCY SWITCHER ---
   useEffect(() => {
-    if (isEditing && defaultValues?.currency) return;
+    // 🟢 COMMANDER FIX: Cast here as well
+    if (isEditing && (defaultValues as any)?.currency) return;
 
     if (isNewClient) {
       setActiveCurrency(profile?.currency || 'ZAR');
@@ -117,7 +118,9 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         brandColor: savedColor,
       });
       if(client) setIsNewClient(false);
-      if(defaultValues.currency) setActiveCurrency(defaultValues.currency);
+      
+      // 🟢 COMMANDER FIX: Cast here as well
+      if((defaultValues as any).currency) setActiveCurrency((defaultValues as any).currency);
     } else {
       reset({
         to: { name: '', address: '', email: '' },

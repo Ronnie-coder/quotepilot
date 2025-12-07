@@ -7,10 +7,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function BackToTop() {
   const [isVisible, setIsVisible] = useState(false);
-  // Using brand colors
-  const bg = useColorModeValue('brand.500', 'brand.400');
-  const hoverBg = useColorModeValue('brand.600', 'brand.500');
-  const color = 'white';
+  
+  // 🟢 COMMANDER FIX: High contrast colors
+  // Light Mode: Darker Teal (teal.600) so it stands out against white backgrounds
+  // Dark Mode: Brighter Teal (teal.400) so it glows against dark backgrounds
+  const bg = useColorModeValue('teal.600', 'teal.400');
+  const hoverBg = useColorModeValue('teal.700', 'teal.300');
+  const iconColor = 'white'; // Always white for best contrast on teal
 
   const toggleVisibility = () => {
     // Show sooner (100px)
@@ -52,7 +55,7 @@ export default function BackToTop() {
             icon={<ArrowUp size={24} />}
             onClick={scrollToTop}
             bg={bg}
-            color={color}
+            color={iconColor}
             size="lg"
             isRound
             shadow="xl"
