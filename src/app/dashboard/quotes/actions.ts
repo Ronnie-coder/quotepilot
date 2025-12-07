@@ -173,7 +173,16 @@ export const generatePdfAction = async (quoteId: string) => {
           subtotal: subtotal, vatAmount: vatAmount, total: quote.total,
         };
     
-        const { pdfBase64, fileName } = await generatePdf(pdfData as any);
+        // 🟢 COMMANDER FIX: Handle Blob conversion manually
+        // Since generatePdf returns a Blob, we must convert it to Base64 
+        // to send it back to the client side safely.
+        const pdfBlob = await generatePdf(pdfData as any);
+        
+        // Convert Blob -> ArrayBuffer -> Buffer -> Base64
+        const arrayBuffer = await pdfBlob.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const pdfBase64 = buffer.toString('base64');
+        const fileName = `${quote.document_type || 'Document'}_${quote.invoice_number}.pdf`;
     
         return { success: true, pdfData: pdfBase64, fileName };
     
