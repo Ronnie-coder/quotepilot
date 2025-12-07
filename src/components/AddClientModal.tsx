@@ -1,4 +1,3 @@
-// FILE: src/components/AddClientModal.tsx
 'use client';
 
 import { useState } from 'react';
@@ -16,6 +15,7 @@ import {
   ModalOverlay,
   useToast,
   VStack,
+  Select,
 } from '@chakra-ui/react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
@@ -34,6 +34,7 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+  const [currency, setCurrency] = useState('ZAR'); // Default currency
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -47,12 +48,10 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
       name,
       email,
       address,
+      currency, // <--- SAVING CURRENCY
       user_id: user.id,
     };
 
-    // --- TACTICAL OVERRIDE IMPLEMENTED ---
-    // The central Supabase types are stale. We cast the payload to 'any'
-    // to bypass the faulty type-check and force the client to send our valid data.
     const { data, error } = await supabase
       .from('clients')
       .insert(payload as any) 
@@ -65,9 +64,11 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
       toast({ title: 'Client added successfully', status: 'success' });
       onClientAdded(data);
       onClose();
+      // Reset form
       setName('');
       setEmail('');
       setAddress('');
+      setCurrency('ZAR');
     }
     setIsLoading(false);
   };
@@ -97,6 +98,23 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
                 onChange={(e) => setEmail(e.target.value)}
               />
             </FormControl>
+            
+            {/* NEW CURRENCY DROPDOWN */}
+            <FormControl>
+              <FormLabel>Billing Currency</FormLabel>
+              <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <option value="ZAR">ZAR (R) - South Africa</option>
+                <option value="USD">USD ($) - International</option>
+                <option value="EUR">EUR (€) - Europe</option>
+                <option value="GBP">GBP (£) - UK</option>
+                <option value="NGN">NGN (₦) - Nigeria</option>
+                <option value="KES">KES (KSh) - Kenya</option>
+                <option value="GHS">GHS (₵) - Ghana</option>
+                <option value="NAD">NAD (N$) - Namibia</option>
+                <option value="BWP">BWP (P) - Botswana</option>
+              </Select>
+            </FormControl>
+
             <FormControl>
               <FormLabel>Client Address</FormLabel>
               <Input

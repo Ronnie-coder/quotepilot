@@ -1,8 +1,7 @@
-// FILE: src/app/dashboard/settings/settings-form.tsx
 'use client';
 
 import {
-  Box, Button, FormControl, FormLabel, Input, VStack, useToast, Textarea, Heading, HStack, Flex, Grid, GridItem, Icon, useColorModeValue, SimpleGrid
+  Box, Button, FormControl, FormLabel, Input, VStack, useToast, Textarea, Heading, HStack, Flex, Grid, GridItem, Icon, useColorModeValue, SimpleGrid, Select, Divider
 } from '@chakra-ui/react';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,7 +11,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Tables } from '@/types/supabase';
 import { uploadLogoAction } from './actions';
 import LogoUploader from '@/components/LogoUploader';
-import { Building, Banknote, FileText, UploadCloud, Save } from 'lucide-react';
+import { Building, Banknote, FileText, UploadCloud, Save, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 type ProfileWithBanking = Tables<'profiles'> & {
@@ -22,6 +21,7 @@ type ProfileWithBanking = Tables<'profiles'> & {
   account_type?: string | null;
   branch_code?: string | null;
   branch_name?: string | null;
+  currency?: string | null; 
 };
 
 type SettingsFormProps = {
@@ -89,7 +89,7 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const searchParams = useSearchParams();
   const toastShownRef = useRef(false);
   
-  // --- THEME COLORS (CYAN UNIFICATION) ---
+  // --- THEME COLORS ---
   const focusBorderColor = useColorModeValue('cyan.500', 'cyan.300');
   const buttonBg = useColorModeValue('cyan.500', 'cyan.400');
   const buttonHoverBg = useColorModeValue('cyan.600', 'cyan.500');
@@ -133,13 +133,17 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const [companyAddress, setCompanyAddress] = useState(profile?.company_address || '');
   const [companyPhone, setCompanyPhone] = useState(profile?.company_phone || '');
   const [vatNumber, setVatNumber] = useState(profile?.vat_number || '');
+  const [currency, setCurrency] = useState(profile?.currency || 'ZAR');
   const [terms, setTerms] = useState(profile?.terms_conditions || '');
+  
+  // Banking States
   const [bankName, setBankName] = useState(profile?.bank_name || '');
   const [accountHolder, setAccountHolder] = useState(profile?.account_holder || '');
   const [accountNumber, setAccountNumber] = useState(profile?.account_number || '');
   const [branchCode, setBranchCode] = useState(profile?.branch_code || '');
   const [branchName, setBranchName] = useState(profile?.branch_name || '');
   const [accountType, setAccountType] = useState(profile?.account_type || '');
+  
   const [isLoading, setIsLoading] = useState(false);
 
   // Form Submission Logic
@@ -153,6 +157,7 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
       company_address: companyAddress,
       company_phone: companyPhone, 
       vat_number: vatNumber, 
+      currency: currency,
       terms_conditions: terms,
       bank_name: bankName, 
       account_holder: accountHolder, 
@@ -163,7 +168,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
       updated_at: new Date().toISOString(),
     };
 
-    // Tactical Override: Casting to 'any' to bypass stale Types
     const { error } = await supabase.from('profiles').upsert(payload as any);
 
     if (error) {
@@ -188,14 +192,73 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
                   <FormLabel>Company Name</FormLabel>
                   <Input focusBorderColor={focusBorderColor} value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
                 </FormControl>
-                <FormControl gridColumn={{ md: 'span 2' }}>
-                  <FormLabel>Company Address</FormLabel>
-                  <Input focusBorderColor={focusBorderColor} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+                
+                {/* --- PAN-AFRICAN CURRENCY SELECTOR --- */}
+                <FormControl isRequired>
+                  <FormLabel>Billing Currency</FormLabel>
+                  <Select 
+                    focusBorderColor={focusBorderColor} 
+                    value={currency} 
+                    onChange={(e) => setCurrency(e.target.value)}
+                  >
+                    <optgroup label="Common">
+                      <option value="ZAR">ZAR (R) - South Africa</option>
+                      <option value="USD">USD ($) - International</option>
+                    </optgroup>
+                    
+                    <optgroup label="Southern Africa">
+                      <option value="NAD">NAD (N$) - Namibia</option>
+                      <option value="BWP">BWP (P) - Botswana</option>
+                      <option value="ZMW">ZMW (K) - Zambia</option>
+                      <option value="MZN">MZN (MT) - Mozambique</option>
+                      <option value="AOA">AOA (Kz) - Angola</option>
+                      <option value="LSL">LSL (L) - Lesotho</option>
+                      <option value="SZL">SZL (E) - Eswatini</option>
+                    </optgroup>
+
+                    <optgroup label="East Africa">
+                      <option value="KES">KES (KSh) - Kenya</option>
+                      <option value="TZS">TZS (TSh) - Tanzania</option>
+                      <option value="UGX">UGX (USh) - Uganda</option>
+                      <option value="RWF">RWF (FRw) - Rwanda</option>
+                      <option value="ETB">ETB (Br) - Ethiopia</option>
+                    </optgroup>
+
+                    <optgroup label="West Africa">
+                      <option value="NGN">NGN (₦) - Nigeria</option>
+                      <option value="GHS">GHS (₵) - Ghana</option>
+                      <option value="XOF">XOF (CFA) - West Africa</option>
+                      <option value="SLL">SLL (Le) - Sierra Leone</option>
+                    </optgroup>
+
+                    <optgroup label="North Africa">
+                      <option value="EGP">EGP (E£) - Egypt</option>
+                      <option value="MAD">MAD (DH) - Morocco</option>
+                    </optgroup>
+
+                    <optgroup label="Central Africa / Islands">
+                      <option value="XAF">XAF (CFA) - Central Africa</option>
+                      <option value="MUR">MUR (₨) - Mauritius</option>
+                    </optgroup>
+
+                    <optgroup label="Global">
+                      <option value="EUR">EUR (€) - Europe</option>
+                      <option value="GBP">GBP (£) - United Kingdom</option>
+                      <option value="AUD">AUD ($) - Australia</option>
+                    </optgroup>
+                  </Select>
                 </FormControl>
+
                 <FormControl>
                   <FormLabel>Company Phone</FormLabel>
                   <Input focusBorderColor={focusBorderColor} value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} />
                 </FormControl>
+
+                <FormControl gridColumn={{ md: 'span 2' }}>
+                  <FormLabel>Company Address</FormLabel>
+                  <Input focusBorderColor={focusBorderColor} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+                </FormControl>
+
                 <FormControl>
                   <FormLabel>VAT Number (Optional)</FormLabel>
                   <Input focusBorderColor={focusBorderColor} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />

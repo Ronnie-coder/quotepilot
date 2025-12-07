@@ -1,5 +1,3 @@
-// This type defines the complete data structure for a single invoice or quote.
-// It will be used by the form, the PDF generator, and the database logic.
 export interface InvoiceFormData {
   logo: string | null;
   documentType: 'Quote' | 'Invoice';
@@ -30,18 +28,22 @@ export interface InvoiceFormData {
     unitPrice: number;
   }[];
   
-  // --- CORRECTION IMPLEMENTED ---
   // Financials
-  applyVat?: boolean; // This missing field was the root cause of recent build failures.
-  vatRate: number; // Stored as a percentage, e.g., 15 for 15%
-
+  applyVat?: boolean;
+  vatRate: number;
+  
   // Payment Info
   payment: {
     bankName: string;
     accountHolder: string;
     accNumber: string;
+    branchCode?: string;
   };
 
   // Optional Notes
   notes: string;
+
+  // Branding & Localization
+  brandColor: string;
+  currency?: string; // <--- NEW: Supports USD, NGN, ZAR, etc.
 }

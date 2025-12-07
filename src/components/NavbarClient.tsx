@@ -3,7 +3,6 @@
 import {
   Box,
   Flex,
-  Heading,
   Button,
   useColorMode,
   useColorModeValue,
@@ -27,10 +26,11 @@ import {
   Badge,
   Container,
   chakra,
-  shouldForwardProp
+  shouldForwardProp,
+  Kbd
 } from '@chakra-ui/react';
 import { MoonIcon, SunIcon, HamburgerIcon, CloseIcon } from '@chakra-ui/icons';
-import { LayoutDashboard, FileText, Settings, LogOut, Users, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, LogOut, Users, HelpCircle, Search } from 'lucide-react';
 import Image from 'next/image';
 import NextLink from 'next/link';
 import { usePathname, useRouter } from 'next/navigation'; 
@@ -38,15 +38,14 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { motion, isValidMotionProp } from 'framer-motion';
 import { SupportModal } from './SupportModal';
+// NEW: Import Command Palette
+import { CommandPalette } from './CommandPalette';
+import { useEffect } from 'react';
 
 // --- CONFIGURATION ---
 const TAGLINE = "Join fellow pilots across Africa 🌍";
 
 // --- MOTION COMPONENT FACTORY ---
-const MotionBox = chakra(motion.div, {
-  shouldForwardProp: (prop) => isValidMotionProp(prop) || shouldForwardProp(prop),
-});
-
 const MotionList = chakra(motion.ul, {
   shouldForwardProp: (prop) => isValidMotionProp(prop) || shouldForwardProp(prop),
 });
@@ -66,15 +65,14 @@ const unauthenticatedLinks = [
   { href: '/sign-up', label: 'Start Flying', variant: 'solid' },
 ];
 
-// --- COMPONENTS ---
-
+// --- SUB-COMPONENT: NAV LINK ---
 const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
   const pathname = usePathname();
   const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
   
-  const activeColor = useColorModeValue('brand.600', 'brand.300');
+  const activeColor = useColorModeValue('teal.600', 'teal.300');
   const inactiveColor = useColorModeValue('gray.600', 'gray.400');
-  const hoverColor = useColorModeValue('brand.500', 'brand.200');
+  const hoverColor = useColorModeValue('teal.500', 'teal.200');
 
   return (
     <ChakraLink
@@ -91,7 +89,6 @@ const NavLink = ({ href, children }: { href: string; children: React.ReactNode }
       }}
     >
       {children}
-      {/* The Underline Indicator */}
       <Box 
         position="absolute"
         bottom="0"
@@ -111,6 +108,7 @@ type NavbarClientProps = {
   user: User | null;
 };
 
+// --- MAIN COMPONENT ---
 const NavbarClient = ({ user }: NavbarClientProps) => {
   const supabase = createSupabaseBrowserClient();
   const router = useRouter(); 
@@ -123,12 +121,29 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
   // Support Modal State
   const { isOpen: isSupportOpen, onOpen: onSupportOpen, onClose: onSupportClose } = useDisclosure();
 
-  // Glassmorphism Variables
+  // Command Palette State
+  const { isOpen: isCmdOpen, onOpen: onCmdOpen, onClose: onCmdClose } = useDisclosure();
+
+  // --- SHORTCUT LISTENER (Cmd+K) ---
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (isCmdOpen) onCmdClose();
+        else onCmdOpen();
+      }
+    };
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, [isCmdOpen, onCmdClose, onCmdOpen]);
+
+  // Theme Variables
   const bgColor = useColorModeValue('rgba(255, 255, 255, 0.85)', 'rgba(23, 25, 35, 0.8)');
   const backdropFilter = "saturate(180%) blur(12px)";
   const borderColor = useColorModeValue('gray.200', 'whiteAlpha.100');
-  
-  const logoFilter = useColorModeValue('none', 'drop-shadow(0 0 6px rgba(79, 209, 197, 0.6))');
+  const logoFilter = useColorModeValue('none', 'drop-shadow(0 0 6px rgba(49, 151, 149, 0.6))'); 
+  const searchBg = useColorModeValue('gray.100', 'whiteAlpha.200');
+  const searchBorder = useColorModeValue('gray.200', 'whiteAlpha.300');
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -149,7 +164,6 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
     if (isOpen) onToggle();
   };
   
-  // Animation Variants
   const mobileMenuVariants = {
     open: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
     closed: { transition: { staggerChildren: 0.05, staggerDirection: -1 } }
@@ -178,7 +192,7 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
           <Flex h={16} alignItems="center" justifyContent="space-between">
             
             {/* --- LOGO SECTION --- */}
-            <Tooltip label={TAGLINE} placement="bottom-start" hasArrow bg="brand.800" color="white" fontSize="xs">
+            <Tooltip label={TAGLINE} placement="bottom-start" hasArrow bg="teal.800" color="white" fontSize="xs">
               <ChakraLink 
                 as={NextLink} 
                 href={user ? '/dashboard' : '/'} 
@@ -193,15 +207,14 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                   >
                     <Image src="/logo.svg" alt="QuotePilot Logo" width={32} height={32} priority />
                   </Box>
-                  <Heading 
-                    as="h1" 
-                    size="md" 
+                  <Text 
+                    fontSize="xl"
                     fontWeight="800" 
                     letterSpacing="tight"
                     color={useColorModeValue('gray.800', 'white')}
                   >
                     QuotePilot
-                  </Heading>
+                  </Text>
                 </HStack>
               </ChakraLink>
             </Tooltip>
@@ -209,11 +222,11 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
             <Spacer />
 
             {/* --- DESKTOP NAV LINKS --- */}
-            <HStack spacing={6} display={{ base: 'none', md: 'flex' }}>
+            <HStack spacing={4} display={{ base: 'none', md: 'flex' }}>
               {user && authenticatedLinks.map(link => (
                 <NavLink key={link.label} href={link.href}>
                   <HStack spacing={1}>
-                    <Icon as={link.icon} size={16} />
+                    <Icon as={link.icon} boxSize={4} />
                     <Text>{link.label}</Text>
                   </HStack>
                 </NavLink>
@@ -222,16 +235,42 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
 
             <Spacer display={{ base: 'none', md: 'flex' }} />
 
+            {/* --- SEARCH TRIGGER (DESKTOP) --- */}
+            {user && (
+              <Box display={{ base: 'none', lg: 'block' }} mr={4}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="gray.500"
+                  borderColor={searchBorder}
+                  bg={searchBg}
+                  fontWeight="normal"
+                  w="200px"
+                  justifyContent="space-between"
+                  onClick={onCmdOpen}
+                  _hover={{ borderColor: 'teal.300', color: 'teal.500' }}
+                >
+                  <HStack>
+                    <Search size={14} />
+                    <Text fontSize="xs">Search...</Text>
+                  </HStack>
+                  <HStack spacing={1}>
+                    <Kbd fontSize="xs" variant="outline">⌘</Kbd>
+                    <Kbd fontSize="xs" variant="outline">K</Kbd>
+                  </HStack>
+                </Button>
+              </Box>
+            )}
+
             {/* --- DESKTOP ACTIONS --- */}
             <HStack spacing={3} display={{ base: 'none', md: 'flex' }}>
-              {/* Support Button (Visible to everyone) */}
               <IconButton 
                 onClick={onSupportOpen} 
                 variant="ghost" 
                 aria-label="Contact Support" 
                 icon={<HelpCircle size={20} />}
                 color="gray.500"
-                _hover={{ color: 'brand.500', bg: 'transparent', transform: 'scale(1.1)' }}
+                _hover={{ color: 'teal.500', bg: 'transparent', transform: 'scale(1.1)' }}
                 transition="all 0.2s"
               />
 
@@ -241,11 +280,10 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                 aria-label="Toggle Color Mode" 
                 icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
                 color="gray.500"
-                _hover={{ color: 'brand.500', bg: 'transparent' }}
+                _hover={{ color: 'teal.500', bg: 'transparent' }}
               />
               
               {!user ? (
-                // Visitor View
                 <>
                   <Button as={NextLink} href="/sign-in" variant="ghost" fontSize="sm" fontWeight="600">
                     Log In
@@ -254,7 +292,7 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                     as={NextLink} 
                     href="/sign-up" 
                     variant="solid" 
-                    colorScheme="brand" 
+                    colorScheme="teal" 
                     size="sm"
                     px={6}
                     boxShadow="md"
@@ -264,7 +302,6 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                   </Button>
                 </>
               ) : (
-                // Pilot View
                 <Menu>
                   <MenuButton 
                     as={Button} 
@@ -275,7 +312,7 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                     px={2}
                   >
                     <HStack>
-                      <Avatar size="sm" name={user.email} src="" bg="brand.500" color="white" />
+                      <Avatar size="sm" name={user.email} src="" bg="teal.500" color="white" />
                       <Box display={{ base: 'none', lg: 'block' }} textAlign="left">
                           <Text fontSize="xs" fontWeight="bold">Commander</Text>
                       </Box>
@@ -305,6 +342,15 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
 
             {/* --- MOBILE TOGGLE --- */}
             <Flex display={{ md: 'none' }} gap={2}>
+              {user && (
+                <IconButton 
+                  onClick={onCmdOpen} 
+                  variant="ghost" 
+                  size="sm"
+                  aria-label="Search" 
+                  icon={<Search size={18} />} 
+                />
+              )}
               <IconButton 
                 onClick={toggleColorMode} 
                 variant="ghost" 
@@ -317,7 +363,7 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                 icon={isOpen ? <CloseIcon /> : <HamburgerIcon />}
                 variant="ghost"
                 aria-label="Toggle Navigation"
-                colorScheme="brand"
+                colorScheme="teal"
               />
             </Flex>
           </Flex>
@@ -340,7 +386,6 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                 <Divider my={2} />
                 
                 {!user ? (
-                  // Mobile Visitor
                   <>
                     {unauthenticatedLinks.map(link => (
                        <MotionListItem key={link.label} variants={mobileLinkVariants}>
@@ -348,7 +393,7 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                           as={NextLink} 
                           href={link.href} 
                           variant={link.variant === 'ghost' ? 'ghost' : 'solid'} 
-                          colorScheme={link.variant === 'solid' ? "brand" : "gray"}
+                          colorScheme={link.variant === 'solid' ? "teal" : "gray"}
                           w="full" 
                           onClick={handleMobileLinkClick}
                           justifyContent="center"
@@ -362,16 +407,8 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                         Support
                       </Button>
                     </MotionListItem>
-                    <MotionListItem variants={mobileLinkVariants}>
-                      <Flex justify="center" mt={4} color="gray.500">
-                        <Text fontSize="xs" fontStyle="italic" textAlign="center">
-                          {TAGLINE}
-                        </Text>
-                      </Flex>
-                    </MotionListItem>
                   </>
                 ) : (
-                  // Mobile Pilot
                   <>
                     <Box px={2} py={2}>
                       <Text fontSize="xs" color="gray.400" textTransform="uppercase" fontWeight="bold" letterSpacing="wider">
@@ -386,7 +423,7 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
                           variant="ghost" 
                           w="full" 
                           justifyContent="flex-start" 
-                          leftIcon={<Icon as={link.icon} color="brand.500" />} 
+                          leftIcon={<Icon as={link.icon} color="teal.500" />} 
                           onClick={handleMobileLinkClick}
                         >
                           {link.label}
@@ -438,8 +475,9 @@ const NavbarClient = ({ user }: NavbarClientProps) => {
         </Container>
       </Box>
       
-      {/* GLOBAL SUPPORT MODAL */}
+      {/* GLOBAL MODALS */}
       <SupportModal isOpen={isSupportOpen} onClose={onSupportClose} email={user?.email} />
+      <CommandPalette isOpen={isCmdOpen} onClose={onCmdClose} />
     </>
   );
 };

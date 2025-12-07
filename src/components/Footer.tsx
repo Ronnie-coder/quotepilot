@@ -29,7 +29,7 @@ const MotionBox = chakra(motion.div, {
 
 const FooterLink = ({ href, children, isExternal = false }: { href: string; children: React.ReactNode; isExternal?: boolean }) => {
   const textColor = useColorModeValue('gray.500', 'gray.400');
-  const hoverColor = useColorModeValue('brand.500', 'brand.300');
+  const hoverColor = useColorModeValue('teal.500', 'teal.300'); // Enforced Teal
   
   return (
     <Link 
@@ -52,31 +52,42 @@ const FooterLink = ({ href, children, isExternal = false }: { href: string; chil
 };
 
 const Footer = () => {
+  // Theme Variables
   const textColor = useColorModeValue('gray.500', 'gray.400');
   const headingColor = useColorModeValue('gray.700', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.800');
-  const bgColor = useColorModeValue('gray.50', 'black');
-  const brandColor = useColorModeValue('brand.500', 'brand.300');
+  const bgColor = useColorModeValue('gray.50', 'black'); // Deep black for dark mode premium feel
+  const brandColor = useColorModeValue('teal.500', 'teal.300');
   
-  const logoFilter = useColorModeValue('none', 'drop-shadow(0 0 5px rgba(49, 151, 149, 0.5))');
+  // COMMANDER UPDATE: Logo Visibility Logic
+  // Light Mode: None (Show original logo)
+  // Dark Mode: Invert colors (Black -> White) AND add Teal Glow
+  const logoFilter = useColorModeValue(
+    'none', 
+    'brightness(0) invert(1) drop-shadow(0 0 5px rgba(49, 151, 149, 0.5))'
+  );
 
   const [currentTime, setCurrentTime] = useState('');
+  
   useEffect(() => {
     const updateTime = () => {
+      // SAST Timezone hardcoded for local relevance
       setCurrentTime(new Date().toLocaleTimeString('en-ZA', { timeZone: 'Africa/Johannesburg', hour: '2-digit', minute: '2-digit' }));
     };
     updateTime();
-    const timer = setInterval(updateTime, 1000 * 30);
+    const timer = setInterval(updateTime, 1000 * 30); // Update every 30s
     return () => clearInterval(timer);
   }, []);
 
+  // Pulse animation for the system status light
   const pulse = keyframes`
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(72, 187, 120, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(72, 187, 120, 0); }
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(49, 151, 149, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(49, 151, 149, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(49, 151, 149, 0); }
   `;
 
-  const appVersion = "v1.8.0-STABLE";
+  // LOCKED VERSION
+  const appVersion = "v2.5.0-RC1";
 
   // Animation Variants
   const containerVariants = {
@@ -98,7 +109,6 @@ const Footer = () => {
             
             {/* Column 1: Brand */}
             <VStack align="flex-start" spacing={4}>
-              {/* FIXED: Removed invalid 'group' prop. Only role="group" remains. */}
               <HStack as={NextLink} href="/" spacing={3} role="group">
                 <Box filter={logoFilter} transition="transform 0.3s ease" _groupHover={{ transform: 'rotate(-5deg)' }}>
                   <Image src="/logo.svg" alt="QuotePilot Logo" width={28} height={28} />
@@ -117,6 +127,7 @@ const Footer = () => {
               <Heading as="h4" size="xs" fontWeight="bold" textTransform="uppercase" letterSpacing="wider" color={headingColor} mb={1}>
                 Platform
               </Heading>
+              {/* Linked to Features Section ID */}
               <FooterLink href="/#features">Capabilities</FooterLink>
               <FooterLink href="/dashboard">Command Center</FooterLink>
               <FooterLink href="/sign-up">Start Flying</FooterLink>
@@ -194,7 +205,7 @@ const Footer = () => {
                     <Box 
                       w={2} 
                       h={2} 
-                      bg="green.400" 
+                      bg="teal.500" 
                       borderRadius="full" 
                       animation={`${pulse} 2s infinite`} 
                     />

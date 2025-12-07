@@ -1,15 +1,20 @@
 'use client';
 
 import { Box, Heading, Text, VStack, HStack, Button, Icon } from '@chakra-ui/react';
-// FIX APPLIED: Added curly braces { } for named import
 import { InvoiceForm } from '@/components/InvoiceForm'; 
 import DocumentViewer from '@/components/DocumentViewer';
 import NextLink from 'next/link';
 import { FilePenLine, ArrowLeft } from 'lucide-react';
 import { Tables } from '@/types/supabase';
 
+// Extended type to ensure TS knows 'currency' exists on the quote
+type ExtendedQuote = Tables<'quotes'> & {
+  clients: Tables<'clients'> | null;
+  currency?: string;
+};
+
 type QuotePageClientProps = {
-  quote: Tables<'quotes'> & { clients: Tables<'clients'> | null };
+  quote: ExtendedQuote;
   profile: Tables<'profiles'> | null;
   clients: Tables<'clients'>[];
   isViewing: boolean;
@@ -43,9 +48,10 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
       </HStack>
       
       {isViewing ? (
-        // TACTICAL TYPE OVERRIDE: Using 'as any' to ensure build passes despite strict type checks
+        // The DocumentViewer will now receive the currency inside the 'quote' object
         <DocumentViewer quote={quote as any} profile={profile} />
       ) : (
+        // The InvoiceForm will receive the currency in defaultValues
         <InvoiceForm profile={profile} clients={clients} defaultValues={quote} />
       )}
     </VStack>

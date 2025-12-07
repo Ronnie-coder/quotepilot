@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import {
   Box, Heading, Text, Button, useColorModeValue, useDisclosure, Flex, Table, Thead, Tbody, Tr, Th, Td, TableContainer,
   InputGroup, InputLeftElement, Input, Menu, MenuButton, MenuList, MenuItem, IconButton, Icon, VStack, HStack, InputRightElement,
-  Badge
+  Badge, Tag, TagLabel
 } from '@chakra-ui/react';
 import { Plus, MoreHorizontal, Edit, Search, X, User as UserIcon, Mail } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
@@ -13,13 +13,14 @@ import EditClientModal from '@/components/EditClientModal';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { DeleteClientButton } from './DeleteClientButton';
 import { motion } from 'framer-motion';
+import { formatCurrency } from '@/utils/formatCurrency';
 
 type Client = {
   id: string;
   name: string | null;
   email: string | null;
   address?: string | null; 
-  total_revenue: number;
+  revenueBreakdown: { currency: string; amount: number }[];
 };
 
 type ClientsClientPageProps = {
@@ -56,7 +57,7 @@ function debounce(func: (...args: any[]) => void, delay: number) {
   };
 }
 
-export default function ClientsClientPage({ clients, count, page, limit, user }: ClientsClientPageProps) {
+export default function ClientsClientPage({ clients = [], count, page, limit, user }: ClientsClientPageProps) {
   const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure();
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -71,7 +72,7 @@ export default function ClientsClientPage({ clients, count, page, limit, user }:
   const rowHoverBg = useColorModeValue('gray.50', 'gray.700');
   const theadBg = useColorModeValue('gray.50', 'gray.900');
   const textColor = useColorModeValue('gray.600', 'gray.400');
-  const primaryColor = useColorModeValue('brand.500', 'brand.300'); // THEME ALIGNED
+  const primaryColor = useColorModeValue('brand.500', 'brand.300'); 
   const headingColor = useColorModeValue('gray.800', 'white');
 
   const handleFilterChange = (key: string, value: string) => {
@@ -92,7 +93,6 @@ export default function ClientsClientPage({ clients, count, page, limit, user }:
     debouncedSearch('q', e.target.value);
   };
 
-  // TACTICAL FIX: Clear now resets state AND URL
   const clearFilters = () => {
     setSearchQuery('');
     handleFilterChange('q', '');
@@ -124,6 +124,7 @@ export default function ClientsClientPage({ clients, count, page, limit, user }:
           isOpen={isEditOpen} 
           onClose={onEditClose} 
           client={editingClient} 
+          // @ts-ignore
           onClientUpdated={handleClientUpdated} 
         />
       )}
@@ -139,7 +140,7 @@ export default function ClientsClientPage({ clients, count, page, limit, user }:
         </Button>
       </Flex>
 
-      {/* Search Bar - TACTICAL FIX: CLEANER CLEAR BUTTON */}
+      {/* Search Bar */}
       <Box as={motion.div} variants={itemVariants} mb={6} maxW="md">
         <InputGroup>
           <InputLeftElement pointerEvents="none"><Icon as={Search} color="gray.400" /></InputLeftElement>
@@ -180,7 +181,7 @@ export default function ClientsClientPage({ clients, count, page, limit, user }:
               </Tr>
             </Thead>
             <Tbody>
-              {clients.length > 0 ? (
+              {clients && clients.length > 0 ? (
                 clients.map((client) => (
                   <Tr 
                     key={client.id} 
@@ -203,13 +204,36 @@ export default function ClientsClientPage({ clients, count, page, limit, user }:
                             <Text fontSize="sm">{client.email}</Text>
                         </HStack>
                     </Td>
+                    
+                    {/* 🟢 COMMANDER UPGRADE: Clean, Badged Currency Stack */}
                     <Td py={4} isNumeric>
-                        {client.total_revenue > 0 ? (
-                             <Text fontWeight="bold" color={headingColor} fontFamily="mono">R {client.total_revenue.toFixed(2)}</Text>
+                        {client.revenueBreakdown && client.revenueBreakdown.length > 0 ? (
+                           <VStack align="end" spacing={2}>
+                             {client.revenueBreakdown.map((item, index) => (
+                               <HStack key={item.currency} spacing={2}>
+                                  {/* Small Badge for Currency Code */}
+                                  <Tag size="sm" variant="subtle" colorScheme={index === 0 ? "brand" : "gray"} borderRadius="full">
+                                      <TagLabel fontSize="xs" fontWeight="bold">{item.currency}</TagLabel>
+                                  </Tag>
+                                  {/* The formatted amount */}
+                                  <Text 
+                                    fontWeight="bold" 
+                                    color={headingColor} 
+                                    fontFamily="mono"
+                                    fontSize={index === 0 ? "md" : "sm"} 
+                                    opacity={index === 0 ? 1 : 0.8}
+                                  >
+                                    {formatCurrency(item.amount, item.currency).replace(item.currency, '').trim()} 
+                                    {/* .replace helps avoid double printing if formatter includes code, ensuring clean look */}
+                                  </Text>
+                               </HStack>
+                             ))}
+                           </VStack>
                         ) : (
                             <Badge colorScheme="gray">NO ACTIVITY</Badge>
                         )}
                     </Td>
+
                     <Td py={4} isNumeric>
                       <Menu>
                         <MenuButton as={IconButton} aria-label="Actions" icon={<Icon as={MoreHorizontal} />} variant="ghost" size="sm" color="gray.500" />

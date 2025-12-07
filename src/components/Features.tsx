@@ -1,209 +1,184 @@
 'use client';
 
-import { 
-  Box, 
-  Container, 
-  Heading, 
-  SimpleGrid, 
-  Icon, 
-  Text, 
-  VStack, 
-  useColorModeValue, 
-  Flex, 
-  chakra, 
-  shouldForwardProp 
+import React from 'react';
+import {
+  Box,
+  Container,
+  Flex,
+  Heading,
+  Text,
+  Stack,
+  useColorModeValue,
+  Icon,
 } from '@chakra-ui/react';
-import { FileText, Users, LayoutDashboard, Palette, ShieldCheck, Zap } from 'lucide-react';
-import { motion, isValidMotionProp } from 'framer-motion';
+import Lottie from 'lottie-react';
+import { FaCheckCircle } from 'react-icons/fa';
 
-// --- MOTION COMPONENT FACTORY (Clean & Warning-Free) ---
-const MotionBox = chakra(motion.div, {
-  shouldForwardProp: (prop) => isValidMotionProp(prop) || shouldForwardProp(prop),
-});
+// Import Lottie JSON assets
+// Ensure strict pathing based on SITREP
+import invoicingAnim from '../assets/animations/invoicing.json';
+import securityAnim from '../assets/animations/security.json';
+import analyticsAnim from '../assets/animations/analytics.json';
 
-// --- FEATURE CARD COMPONENT ---
-const FeatureCard = ({ title, text, icon }: { title: string; text: string; icon: React.ElementType }) => {
-  const bg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.100', 'gray.700');
-  const iconBg = useColorModeValue('brand.50', 'whiteAlpha.100');
-  const iconColor = useColorModeValue('brand.500', 'brand.300'); // Tuned for better contrast in dark mode
-  const hoverBorder = useColorModeValue('brand.400', 'brand.500');
+interface FeatureProps {
+  title: string;
+  description: string;
+  animationData: any;
+  index: number;
+}
 
-  // Animation variants for the icon on card hover
-  const iconVariants = {
-    rest: { scale: 1, rotate: 0, transition: { duration: 0.3 } },
-    hover: { scale: 1.15, rotate: -10, transition: { duration: 0.3 } },
-  };
-
-  // Animation variant for the card entry
-  const cardVariant = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
-  };
+const FeatureItem = ({ title, description, animationData, index }: FeatureProps) => {
+  // Zig-Zag Logic: Even numbers = Text Left / Anim Right. Odd = Anim Left / Text Right.
+  const isEven = index % 2 === 0;
+  
+  // Glassmorphism & Teal Theme Vars
+  const glassBg = useColorModeValue('whiteAlpha.800', 'whiteAlpha.50');
+  const glassBorder = useColorModeValue('gray.200', 'whiteAlpha.100');
+  const textColor = useColorModeValue('gray.600', 'gray.300');
+  const accentColor = 'teal.400';
 
   return (
-    <MotionBox
-      variants={cardVariant}
-      // Chakra styles
-      display="flex"
-      flexDirection="column"
-      alignItems="flex-start"
-      p={8}
-      bg={bg}
-      borderRadius="2xl"
-      border="1px solid"
-      borderColor={borderColor}
-      boxShadow="lg"
-      transition="all 0.3s ease-out"
-      _hover={{
-        transform: 'translateY(-5px)',
-        boxShadow: 'xl',
-        borderColor: hoverBorder,
-      }}
-      h="full"
-      // Framer props
-      initial="rest"
-      whileHover="hover"
-      animate="rest"
+    <Flex
+      align="center"
+      justify="center"
+      direction={{ base: 'column', lg: isEven ? 'row' : 'row-reverse' }}
+      gap={{ base: 10, lg: 20 }}
+      py={16}
     >
-      <MotionBox
-        variants={iconVariants} 
-        w={12}
-        h={12}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        borderRadius="lg"
-        bg={iconBg}
-        mb={5}
+      {/* TEXT SECTION */}
+      <Box
+        flex={1}
+        bg={glassBg}
+        backdropFilter="blur(10px)"
+        border="1px solid"
+        borderColor={glassBorder}
+        p={8}
+        borderRadius="2xl"
+        boxShadow="xl"
+        position="relative"
+        overflow="hidden"
+        _before={{
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '4px',
+          height: '100%',
+          bg: accentColor,
+        }}
       >
-        <Icon as={icon} w={6} h={6} color={iconColor} strokeWidth={2} />
-      </MotionBox>
-      
-      <Heading as="h3" size="md" fontWeight="bold" mb={3} letterSpacing="tight">
-        {title}
-      </Heading>
-      
-      <Text color={useColorModeValue('gray.600', 'gray.400')} fontSize="md" lineHeight="1.6">
-        {text}
-      </Text>
-    </MotionBox>
+        <Stack spacing={4}>
+          <Flex align="center" color={accentColor} mb={2}>
+            <Icon as={FaCheckCircle} w={5} h={5} mr={2} />
+            <Text fontWeight="bold" letterSpacing="wide" fontSize="sm" textTransform="uppercase">
+              Feature {index + 1}
+            </Text>
+          </Flex>
+          
+          <Heading as="h3" size="lg" fontWeight="bold">
+            {title}
+          </Heading>
+          
+          <Text fontSize="lg" color={textColor} lineHeight="tall">
+            {description}
+          </Text>
+        </Stack>
+      </Box>
+
+      {/* ANIMATION SECTION */}
+      <Box 
+        flex={1} 
+        maxW={{ base: '100%', lg: '500px' }}
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+      >
+        <Box 
+            width="100%" 
+            filter={`drop-shadow(0px 0px 20px rgba(56, 178, 172, 0.3))`} // Teal glow
+        >
+          <Lottie 
+            animationData={animationData} 
+            loop={true} 
+            autoplay={true} 
+          />
+        </Box>
+      </Box>
+    </Flex>
   );
 };
 
-export default function Features() {
-  // Atmospheric background gradient
-  const gradientBg = useColorModeValue(
-    'radial-gradient(circle at 50% -20%, var(--chakra-colors-brand-50), var(--chakra-colors-gray-50) 70%)',
-    'radial-gradient(circle at 50% 0%, var(--chakra-colors-gray-900), black 70%)'
-  );
-
-  // --- Animation variants ---
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1, 
-      transition: { 
-        staggerChildren: 0.1,
-        delayChildren: 0.2
-      } 
+const Features = () => {
+  const featuresData = [
+    {
+      title: 'Automated Invoicing Engine',
+      description:
+        'Stop chasing payments. Our automated engine generates professional, compliant invoices in seconds. Customize templates to match your brand and set up recurring billing cycles effortlessly.',
+      animationData: invoicingAnim,
     },
-  };
-
-  const textVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
-  };
+    {
+      title: 'Military-Grade Security',
+      description:
+        'Your client data is sacred. We utilize Row Level Security (RLS) and end-to-end encryption to ensure that your sensitive financial information remains accessible only to you.',
+      animationData: securityAnim,
+    },
+    {
+      title: 'Real-Time Analytics',
+      description:
+        'Fly by instrument, not by feel. Visual dashboards provide real-time insights into your revenue, outstanding payments, and client retention rates. Make decisions based on data, not guesses.',
+      animationData: analyticsAnim,
+    },
+  ];
 
   return (
-    <Box as="section" id="features" py={{ base: 20, md: 32 }} bg={gradientBg}>
-      <Container maxW="container.xl">
-        
-        {/* HEADER SECTION */}
-        <MotionBox
-          display="flex"
-          flexDirection="column"
-          alignItems="center"
-          textAlign="center"
-          mb={20}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={containerVariants}
-        >
-          <MotionBox variants={textVariants}>
-            <Text
-              color={useColorModeValue('brand.600', 'brand.400')}
-              fontWeight="bold"
-              letterSpacing="wide"
-              textTransform="uppercase"
-              fontSize="sm"
-              mb={2}
-            >
-              The Toolkit
-            </Text>
-          </MotionBox>
-          
-          <MotionBox variants={textVariants}>
-            <Heading as="h2" size="2xl" fontWeight="900" mb={4} letterSpacing="tight">
-              Everything You Need,<br /> Nothing You Don't
-            </Heading>
-          </MotionBox>
+    <Box as="section" py={20} position="relative" overflow="hidden">
+      {/* Decorative Background Elements */}
+      <Box
+        position="absolute"
+        top="10%"
+        right="0"
+        width="400px"
+        height="400px"
+        bg="teal.500"
+        opacity="0.1"
+        filter="blur(100px)"
+        zIndex="-1"
+      />
+      
+      <Box
+        position="absolute"
+        bottom="10%"
+        left="0"
+        width="400px"
+        height="400px"
+        bg="blue.500"
+        opacity="0.1"
+        filter="blur(100px)"
+        zIndex="-1"
+      />
 
-          <MotionBox variants={textVariants}>
-            <Text
-              fontSize="lg"
-              color={useColorModeValue('gray.600', 'gray.400')}
-              maxW="2xl"
-              lineHeight="relaxed"
-            >
-              We stripped away the bloat. QuotePilot gives you the essential tools to manage clients and get paid, packaged in a fast, beautiful interface.
-            </Text>
-          </MotionBox>
-        </MotionBox>
-        
-        {/* GRID SECTION */}
-        <MotionBox
-          display="grid"
-          gridTemplateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }}
-          gridGap={8}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          variants={containerVariants}
-        >
-          <FeatureCard
-            icon={FileText}
-            title="Instant PDFs"
-            text="Create professional Quotes and Invoices that look great on any device. Download instantly as clean, branded PDFs."
+      <Container maxW="7xl">
+        <Stack spacing={4} as={Container} maxW={'3xl'} textAlign={'center'} mb={16}>
+          <Heading fontSize={{ base: '3xl', md: '5xl' }} fontWeight="bold">
+            Built for <Text as="span" color="teal.400">Scale</Text>
+          </Heading>
+          <Text color={'gray.500'} fontSize={'xl'}>
+            QuotePilot equips you with the tools necessary to ascend from freelancer to agency.
+          </Text>
+        </Stack>
+
+        {featuresData.map((feature, index) => (
+          <FeatureItem
+            key={index}
+            index={index}
+            title={feature.title}
+            description={feature.description}
+            animationData={feature.animationData}
           />
-          <FeatureCard
-            icon={Palette}
-            title="Brand Consistency"
-            text="Your logo, your identity. Set it up once in settings, and every document you generate carries your professional seal."
-          />
-          <FeatureCard
-            icon={Users}
-            title="Client Directory"
-            text="Stop digging through emails. Keep all your client details in one secure list for rapid-fire document creation."
-          />
-          <FeatureCard
-            icon={LayoutDashboard}
-            title="Revenue Tracking"
-            text="The Dashboard shows you exactly what matters: Total Revenue and recent document history."
-          />
-          <FeatureCard
-            icon={ShieldCheck}
-            title="Data Ownership"
-            text="Your financial data is yours. We use enterprise-grade security (Supabase) to keep your records locked and safe."
-          />
-          <FeatureCard
-            icon={Zap}
-            title="Zero Latency"
-            text="No loading spinners. QuotePilot is built on modern tech (Next.js) for instant transitions. Time is money."
-          />
-        </MotionBox>
+        ))}
       </Container>
     </Box>
   );
-}
+};
+
+export default Features;

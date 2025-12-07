@@ -2,62 +2,24 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import {
-  Box,
-  Heading,
-  Button,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  TableContainer,
-  HStack,
-  IconButton,
-  Tag,
-  TagLabel,
-  TagLeftIcon,
-  useColorModeValue,
-  Spinner,
-  useToast,
-  VStack,
-  Text,
-  Flex,
-  Icon,
-  InputGroup,
-  InputLeftElement,
-  Input,
-  InputRightElement,
-  Select,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  MenuDivider,
-  MenuGroup,
-  chakra,
-  Tooltip
+  Box, Heading, Button, Table, Thead, Tbody, Tr, Th, Td, TableContainer,
+  HStack, IconButton, Tag, TagLabel, TagLeftIcon, useColorModeValue,
+  Spinner, useToast, VStack, Text, Flex, Icon, InputGroup, InputLeftElement,
+  Input, InputRightElement, Select, Menu, MenuButton, MenuList, MenuItem,
+  MenuDivider, MenuGroup, chakra,
 } from '@chakra-ui/react';
 import { 
-  Plus, 
-  Eye, 
-  FilePenLine, 
-  Download, 
-  MoreHorizontal, 
-  Search, 
-  X, 
-  CheckCircle2, 
-  AlertCircle, 
-  Send,
-  FileText
+  Plus, Eye, Download, MoreHorizontal, Search, X, CheckCircle2, AlertCircle, Send, FileText
 } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { DeleteButton } from './DeleteButton';
-import { updateDocumentStatusAction, generatePdfAction } from './actions';
+import { updateDocumentStatusAction, getQuoteForPdf } from './actions';
+import { generatePdf } from '@/utils/pdfGenerator';
+import { formatCurrency } from '@/utils/formatCurrency';
 import { motion, isValidMotionProp } from 'framer-motion';
 
-// --- 1.0 TYPE DEFINITIONS ---
+// --- TYPE DEFINITIONS ---
 type DocumentStatus = 'draft' | 'sent' | 'paid' | 'overdue';
 type DocumentType = 'Quote' | 'Invoice';
 
@@ -68,41 +30,27 @@ interface Document {
   invoice_number: string;
   status: DocumentStatus | string;
   total: number;
+  currency?: string; 
   clients: { name: string };
 }
 
+// 🟢 COMMANDER FIX: Interface now expects 'documents', not 'initialDocuments'
 interface QuotesClientPageProps {
-  initialDocuments: Document[];
+  documents: Document[]; 
   count: number;
   page: number;
   limit: number;
 }
 
-// --- 2.0 ANIMATION COMPONENT FACTORY ---
-// We wrap motion components to prevent Chakra UI from stripping props
-const MotionBox = chakra(motion.div, {
-  shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
-});
+// --- ANIMATION WRAPPERS ---
+const MotionBox = chakra(motion.div, { shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children' });
+const MotionTr = chakra(motion.tr, { shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children' });
+const MotionFlex = chakra(motion.div, { shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children' });
 
-const MotionTr = chakra(motion.tr, {
-  shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
-});
+const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
+const itemVariants = { hidden: { y: 10, opacity: 0 }, visible: { y: 0, opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } } };
 
-const MotionFlex = chakra(motion.div, {
-  shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children',
-});
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
-};
-
-const itemVariants = {
-  hidden: { y: 10, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } },
-};
-
-// --- 3.0 HELPER FUNCTIONS ---
+// --- HELPER ---
 function debounce(func: (...args: any[]) => void, delay: number) {
   let timeoutId: NodeJS.Timeout;
   return (...args: any[]) => {
@@ -111,26 +59,22 @@ function debounce(func: (...args: any[]) => void, delay: number) {
   };
 }
 
-// --- 4.0 MAIN COMPONENT ---
-export default function QuotesClientPage({
-  initialDocuments,
-  count,
-  page,
-  limit,
-}: QuotesClientPageProps) {
-  // STATE
-  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
+// --- MAIN COMPONENT ---
+// 🟢 COMMANDER FIX: We alias 'documents' to 'serverDocuments' and default it to [] 
+export default function QuotesClientPage({ documents: serverDocuments = [], count, page, limit }: QuotesClientPageProps) {
+  
+  // Initialize state with the incoming server data
+  const [documents, setDocuments] = useState<Document[]>(serverDocuments);
+  
   const [loadingPdfId, setLoadingPdfId] = useState<string | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // HOOKS
   const toast = useToast();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // THEME
   const brandColor = 'brand.500';
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -138,22 +82,17 @@ export default function QuotesClientPage({
   const mutedText = useColorModeValue('gray.500', 'gray.400');
   const rowHoverBg = useColorModeValue('gray.50', 'gray.700');
 
-  // EFFECTS
-  useEffect(() => {
-    setDocuments(initialDocuments);
-  }, [initialDocuments]);
+  // 🟢 COMMANDER FIX: Sync state if server data changes
+  useEffect(() => { setDocuments(serverDocuments); }, [serverDocuments]);
   
   useEffect(() => {
     const q = searchParams.get('q');
     if (q) setSearchQuery(q);
   }, [searchParams]);
 
-  // HANDLERS
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value);
-    else params.delete(key);
-    
+    if (value) params.set(key, value); else params.delete(key);
     params.set('page', '1');
     router.push(`${pathname}?${params.toString()}`);
   };
@@ -184,7 +123,6 @@ export default function QuotesClientPage({
     setDocuments(docs => docs.map(doc => doc.id === documentId ? { ...doc, status: newStatus } : doc));
 
     const result = await updateDocumentStatusAction(documentId, newStatus);
-    
     if (result.success) {
       toast({ title: 'Status Updated', status: 'success', duration: 2000, isClosable: true });
     } else {
@@ -196,53 +134,56 @@ export default function QuotesClientPage({
 
   const handleDownload = async (documentId: string, documentNumber: string) => {
     setLoadingPdfId(documentId);
-    const result = await generatePdfAction(documentId);
-    
-    if (result.success && result.pdfData) {
+    try {
+      const result = await getQuoteForPdf(documentId);
+      if (result.error || !result.quote || !result.profile) throw new Error(result.error || 'Could not retrieve document data.');
+      const { quote, profile } = result;
+
+      const blob = await generatePdf({
+        documentType: quote.document_type as any || 'Quote',
+        brandColor: quote.brand_color || '#319795', 
+        invoiceNumber: quote.invoice_number,
+        invoiceDate: quote.invoice_date || quote.created_at,
+        dueDate: quote.due_date,
+        logo: profile.logo_url || profile.avatar_url || null, 
+        from: { name: profile.company_name, email: profile.email, address: profile.company_address },
+        to: { name: quote.clients?.name, email: quote.clients?.email, address: quote.clients?.address },
+        lineItems: (quote.line_items as any) || [],
+        notes: quote.notes,
+        vatRate: quote.vat_rate,
+        subtotal: 0,
+        vatAmount: 0,
+        total: quote.total,
+        currency: quote.currency, 
+        payment: { bankName: profile.bank_name, accountHolder: profile.account_holder, accNumber: profile.account_number, branchCode: profile.branch_code }
+      });
+
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = `data:application/pdf;base64,${result.pdfData}`;
-      link.download = result.fileName || `QP-${documentNumber}.pdf`;
+      link.href = url;
+      link.download = `${quote.document_type}_${documentNumber}.pdf`;
       link.click();
-      link.remove();
+      window.URL.revokeObjectURL(url);
       toast({ title: 'PDF Downloaded', status: 'success', duration: 2000 });
-    } else {
-      toast({ title: 'Download Failed', description: result.error, status: 'error' });
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: 'Download Failed', description: 'Ensure settings are saved.', status: 'error' });
+    } finally {
+      setLoadingPdfId(null);
     }
-    setLoadingPdfId(null);
   };
 
   const isActionDisabled = (id: string) => loadingPdfId === id || updatingStatusId === id;
   const totalPages = Math.ceil(count / limit);
-
-  return (
+    return (
     <MotionBox variants={containerVariants} initial="hidden" animate="visible">
       {/* 1. HEADER */}
-      <MotionFlex 
-        variants={itemVariants} 
-        display="flex"
-        flexDirection={{ base: 'column', md: 'row' }} 
-        justifyContent="space-between" 
-        alignItems={{ base: 'start', md: 'center' }} 
-        mb={8} 
-        gap={4}
-      >
+      <MotionFlex variants={itemVariants} display="flex" flexDirection={{ base: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ base: 'start', md: 'center' }} mb={8} gap={4}>
         <Box>
           <Heading as="h1" size="xl" mb={1} letterSpacing="tight">Documents</Heading>
           <Text color={mutedText}>Manage your quotes, invoices, and revenue.</Text>
         </Box>
-        <Button 
-          as={NextLink} 
-          href="/quote/new" 
-          leftIcon={<Icon as={Plus} />} 
-          bg={brandColor}
-          color="white"
-          _hover={{ opacity: 0.9, transform: 'translateY(-1px)' }}
-          transition="all 0.2s"
-          px={6} 
-          shadow="md"
-        >
-          Create Document
-        </Button>
+        <Button as={NextLink} href="/quote/new" leftIcon={<Icon as={Plus} />} bg={brandColor} color="white" _hover={{ opacity: 0.9, transform: 'translateY(-1px)' }} transition="all 0.2s" px={6} shadow="md">Create Document</Button>
       </MotionFlex>
       
       {/* 2. CONTROLS */}
@@ -250,55 +191,11 @@ export default function QuotesClientPage({
         <Flex direction={{ base: 'column', md: 'row' }} gap={4}>
           <InputGroup maxW={{ md: '350px' }}>
             <InputLeftElement pointerEvents="none"><Icon as={Search} color="gray.400" size={18} /></InputLeftElement>
-            <Input 
-              placeholder="Search client or doc #" 
-              value={searchQuery} 
-              onChange={handleSearchChange} 
-              bg={cardBg}
-              borderRadius="md"
-              focusBorderColor={brandColor}
-            />
-            {searchQuery && (
-              <InputRightElement>
-                <IconButton 
-                  aria-label="Clear search" 
-                  icon={<X size={14} />} 
-                  size="xs" 
-                  variant="ghost" 
-                  onClick={clearSearch} 
-                  borderRadius="full"
-                />
-              </InputRightElement>
-            )}
+            <Input placeholder="Search client or doc #" value={searchQuery} onChange={handleSearchChange} bg={cardBg} borderRadius="md" focusBorderColor={brandColor} />
+            {searchQuery && (<InputRightElement><IconButton aria-label="Clear search" icon={<X size={14} />} size="xs" variant="ghost" onClick={clearSearch} borderRadius="full" /></InputRightElement>)}
           </InputGroup>
-          
-          <Select 
-            placeholder="All Statuses" 
-            w={{ md: '200px' }}
-            bg={cardBg}
-            borderRadius="md"
-            focusBorderColor={brandColor}
-            value={searchParams.get('status') || ''} 
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-          >
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="paid">Paid</option>
-            <option value="overdue">Overdue</option>
-          </Select>
-          
-          <Select 
-            placeholder="All Types" 
-            w={{ md: '200px' }}
-            bg={cardBg}
-            borderRadius="md"
-            focusBorderColor={brandColor}
-            value={searchParams.get('type') || ''} 
-            onChange={(e) => handleFilterChange('type', e.target.value)}
-          >
-            <option value="Quote">Quote</option>
-            <option value="Invoice">Invoice</option>
-          </Select>
+          <Select placeholder="All Statuses" w={{ md: '200px' }} bg={cardBg} borderRadius="md" focusBorderColor={brandColor} value={searchParams.get('status') || ''} onChange={(e) => handleFilterChange('status', e.target.value)}><option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option></Select>
+          <Select placeholder="All Types" w={{ md: '200px' }} bg={cardBg} borderRadius="md" focusBorderColor={brandColor} value={searchParams.get('type') || ''} onChange={(e) => handleFilterChange('type', e.target.value)}><option value="Quote">Quote</option><option value="Invoice">Invoice</option></Select>
         </Flex>
       </VStack>
 
@@ -307,28 +204,12 @@ export default function QuotesClientPage({
         <TableContainer>
           <Table variant="simple">
             <Thead bg={theadBg}>
-              <Tr>
-                <Th>Status</Th>
-                <Th>Number</Th>
-                <Th>Client</Th>
-                <Th>Date</Th>
-                <Th isNumeric>Amount</Th>
-                <Th isNumeric>Actions</Th>
-              </Tr>
+              <Tr><Th>Status</Th><Th>Number</Th><Th>Client</Th><Th>Date</Th><Th isNumeric>Amount</Th><Th isNumeric>Actions</Th></Tr>
             </Thead>
             <Tbody>
               {documents.length > 0 ? (
                 documents.map((doc) => (
-                  <DocumentRow 
-                    key={doc.id} 
-                    doc={doc} 
-                    isDisabled={isActionDisabled(doc.id)} 
-                    isLoadingPdf={loadingPdfId === doc.id} 
-                    isUpdatingStatus={updatingStatusId === doc.id}
-                    handleStatusUpdate={handleStatusUpdate} 
-                    handleDownload={handleDownload} 
-                    rowHoverBg={rowHoverBg}
-                  />
+                  <DocumentRow key={doc.id} doc={doc} isDisabled={isActionDisabled(doc.id)} isLoadingPdf={loadingPdfId === doc.id} isUpdatingStatus={updatingStatusId === doc.id} handleStatusUpdate={handleStatusUpdate} handleDownload={handleDownload} rowHoverBg={rowHoverBg} />
                 ))
               ) : (
                 <Tr>
@@ -357,7 +238,7 @@ export default function QuotesClientPage({
           <HStack>
             <Button onClick={() => handlePageChange(page - 1)} isDisabled={page <= 1} size="sm" variant="outline">Previous</Button>
             <Text fontSize="sm" fontWeight="bold">Page {page} of {totalPages}</Text>
-                        <Button onClick={() => handlePageChange(page + 1)} isDisabled={page >= totalPages} size="sm" variant="outline">Next</Button>
+            <Button onClick={() => handlePageChange(page + 1)} isDisabled={page >= totalPages} size="sm" variant="outline">Next</Button>
           </HStack>
         </Flex>
       }
@@ -376,137 +257,49 @@ interface DocumentRowProps {
   rowHoverBg: string;
 }
 
-const DocumentRow = ({ 
-  doc, 
-  isDisabled, 
-  isLoadingPdf, 
-  isUpdatingStatus,
-  handleStatusUpdate, 
-  handleDownload, 
-  rowHoverBg 
-}: DocumentRowProps) => {
-  
+const DocumentRow = ({ doc, isDisabled, isLoadingPdf, isUpdatingStatus, handleStatusUpdate, handleDownload, rowHoverBg }: DocumentRowProps) => {
   const statusLower = doc.status?.toLowerCase() || 'draft';
   let statusConfig = { color: 'gray', icon: FileText, label: 'DRAFT' };
   
   switch (statusLower) {
-    case 'sent': 
-      statusConfig = { color: 'blue', icon: Send, label: 'SENT' }; 
-      break;
-    case 'paid': 
-      statusConfig = { color: 'green', icon: CheckCircle2, label: 'PAID' }; 
-      break;
-    case 'overdue': 
-      statusConfig = { color: 'red', icon: AlertCircle, label: 'OVERDUE' }; 
-      break;
-    default:
-      statusConfig = { color: 'gray', icon: FileText, label: 'DRAFT' };
+    case 'sent': statusConfig = { color: 'blue', icon: Send, label: 'SENT' }; break;
+    case 'paid': statusConfig = { color: 'green', icon: CheckCircle2, label: 'PAID' }; break;
+    case 'overdue': statusConfig = { color: 'red', icon: AlertCircle, label: 'OVERDUE' }; break;
+    default: statusConfig = { color: 'gray', icon: FileText, label: 'DRAFT' };
   }
 
-  const formattedDate = new Date(doc.created_at).toLocaleDateString('en-ZA', { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric' 
-  });
+  const formattedDate = new Date(doc.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
-    <MotionTr 
-      variants={itemVariants} 
-      _hover={{ bg: rowHoverBg }}
-      // Note: 'transition' prop removed here to prevent Type Error. Animation is handled by 'variants'.
-    >
-      {/* STATUS */}
+    <MotionTr variants={itemVariants} _hover={{ bg: rowHoverBg }}>
       <Td>
         <Tag size="sm" colorScheme={statusConfig.color} borderRadius="full" px={3} py={1}>
           <TagLeftIcon boxSize="12px" as={statusConfig.icon} />
           <TagLabel fontWeight="bold" fontSize="10px">{statusConfig.label}</TagLabel>
         </Tag>
       </Td>
-
-      {/* DOCUMENT NUMBER */}
-      <Td fontWeight="medium" fontSize="sm">
-        {doc.invoice_number}
-        <Tag ml={2} size="sm" variant="outline" colorScheme="gray" fontSize="xs">
-          {doc.document_type === 'Invoice' ? 'INV' : 'QT'}
-        </Tag>
-      </Td>
-
-      {/* CLIENT */}
+      <Td fontWeight="medium" fontSize="sm">{doc.invoice_number}<Tag ml={2} size="sm" variant="outline" colorScheme="gray" fontSize="xs">{doc.document_type === 'Invoice' ? 'INV' : 'QT'}</Tag></Td>
       <Td fontSize="sm" color="gray.600">{doc.clients.name}</Td>
-
-      {/* DATE */}
       <Td fontSize="sm" color="gray.500">{formattedDate}</Td>
-
-      {/* AMOUNT (MONOSPACE) */}
       <Td isNumeric fontWeight="bold" fontFamily="mono" color="gray.700">
-        R {doc.total.toFixed(2)}
+        {formatCurrency(doc.total, doc.currency)}
       </Td>
-
-      {/* ACTIONS */}
       <Td isNumeric>
         <Menu autoSelect={false} placement="bottom-end">
-          <MenuButton 
-            as={IconButton} 
-            aria-label="Actions" 
-            icon={<Icon as={MoreHorizontal} />} 
-            variant="ghost" 
-            size="sm" 
-            isDisabled={isDisabled}
-          />
+          <MenuButton as={IconButton} aria-label="Actions" icon={<Icon as={MoreHorizontal} />} variant="ghost" size="sm" isDisabled={isDisabled} />
           <MenuList fontSize="sm" shadow="lg" borderColor="gray.200">
-            {/* Primary Actions */}
-            <MenuItem as={NextLink} href={`/quote/${doc.id}?view=true`} icon={<Icon as={Eye} boxSize={4} />}>
-              View Document
-            </MenuItem>
-            <MenuItem as={NextLink} href={`/quote/${doc.id}`} icon={<Icon as={FilePenLine} boxSize={4} />}>
-              Edit Details
-            </MenuItem>
-            <MenuItem 
-              onClick={() => handleDownload(doc.id, doc.invoice_number)}
-              icon={isLoadingPdf ? <Spinner size="xs" /> : <Icon as={Download} boxSize={4} />}
-              isDisabled={isLoadingPdf}
-            >
+            <MenuItem as={NextLink} href={`/quote/${doc.id}`} icon={<Icon as={Eye} boxSize={4} />}>View / Edit</MenuItem>
+            <MenuItem onClick={() => handleDownload(doc.id, doc.invoice_number)} icon={isLoadingPdf ? <Spinner size="xs" /> : <Icon as={Download} boxSize={4} />} isDisabled={isLoadingPdf}>
               {isLoadingPdf ? 'Generating...' : 'Download PDF'}
             </MenuItem>
-
             <MenuDivider />
-
-            {/* Quick Status Updates */}
             <MenuGroup title="Update Status">
-              {statusLower !== 'sent' && (
-                <MenuItem 
-                  onClick={() => handleStatusUpdate(doc.id, 'sent')} 
-                  icon={<Icon as={Send} boxSize={4} color="blue.500" />}
-                >
-                  Mark as Sent
-                </MenuItem>
-              )}
-              {statusLower !== 'paid' && (
-                <MenuItem 
-                  onClick={() => handleStatusUpdate(doc.id, 'paid')} 
-                  icon={<Icon as={CheckCircle2} boxSize={4} color="green.500" />}
-                >
-                  Mark as Paid
-                </MenuItem>
-              )}
-              {statusLower !== 'draft' && (
-                <MenuItem 
-                  onClick={() => handleStatusUpdate(doc.id, 'draft')} 
-                  icon={<Icon as={FileText} boxSize={4} color="gray.500" />}
-                >
-                  Mark as Draft
-                </MenuItem>
-              )}
+              {statusLower !== 'sent' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'sent')} icon={<Icon as={Send} boxSize={4} color="blue.500" />}>Mark as Sent</MenuItem>)}
+              {statusLower !== 'paid' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'paid')} icon={<Icon as={CheckCircle2} boxSize={4} color="green.500" />}>Mark as Paid</MenuItem>)}
+              {statusLower !== 'draft' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'draft')} icon={<Icon as={FileText} boxSize={4} color="gray.500" />}>Mark as Draft</MenuItem>)}
             </MenuGroup>
-
             <MenuDivider />
-
-            {/* Danger Zone */}
-            <DeleteButton 
-              quoteId={doc.id} 
-              clientName={doc.clients.name} 
-              isDisabled={isDisabled} 
-            />
+            <DeleteButton quoteId={doc.id} clientName={doc.clients.name} isDisabled={isDisabled} />
           </MenuList>
         </Menu>
       </Td>

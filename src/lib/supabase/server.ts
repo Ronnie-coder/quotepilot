@@ -1,13 +1,8 @@
-// FILE: src/lib/supabase/server.ts
-
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-// --- CORRECTIVE ACTION 1: Import the base client for server-to-server operations ---
 import { createClient } from '@supabase/supabase-js';
 
-// This function is for use in Server Components, Server Actions, and Route Handlers.
-// It creates a Supabase client that can read and write cookies.
-// THIS FUNCTION IS CORRECT AND REMAINS UNCHANGED.
+// 1. STANDARD SERVER CLIENT (For Server Components/Actions)
 export const createSupabaseServerClient = () => {
   const cookieStore = cookies();
 
@@ -23,14 +18,14 @@ export const createSupabaseServerClient = () => {
           try {
             cookieStore.set({ name, value, ...options });
           } catch (error) {
-            // This can happen in Server Components. The error is expected and can be ignored.
+            // Ignored: Expected behavior in Server Components
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options });
           } catch (error) {
-            // This can happen in Server Components. The error is expected and can be ignored.
+            // Ignored: Expected behavior in Server Components
           }
         },
       },
@@ -38,14 +33,16 @@ export const createSupabaseServerClient = () => {
   );
 };
 
-// --- CORRECTIVE ACTION 2: Reconfigure the Admin Client ---
-// This function is for privileged, server-to-server operations that need to bypass RLS.
-// It must use the base `createClient` with the service role key, not the SSR-specific client.
+// 2. ADMIN CLIENT (Bypasses RLS - Use with Caution)
 export const createSupabaseAdminClient = () => {
-    // Using the correct 'createClient' function for a service role client.
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-        // The third 'cookies' argument is not required here, which resolves the build error.
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
     );
-}
+};

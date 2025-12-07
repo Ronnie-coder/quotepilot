@@ -2,15 +2,40 @@
 
 import { useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { Box, Button, Flex, FormControl, FormLabel, Input, Heading, Text, Link, Alert, AlertIcon, useColorModeValue, Stack, Divider, Icon, useToast, InputGroup, InputRightElement } from '@chakra-ui/react';
+import { 
+  Box, 
+  Button, 
+  Flex, 
+  FormControl, 
+  FormLabel, 
+  Input, 
+  Heading, 
+  Text, 
+  Link, 
+  Alert, 
+  AlertIcon, 
+  useColorModeValue, 
+  Stack, 
+  Divider, 
+  Icon, 
+  useToast, 
+  InputGroup, 
+  InputRightElement,
+  SimpleGrid,
+  VStack
+} from '@chakra-ui/react';
+import Image from 'next/image';
 import NextLink from 'next/link';
-import { FaGoogle, FaGithub } from 'react-icons/fa';
+import { FaGoogle, FaGithub, FaLinkedin, FaTwitter } from 'react-icons/fa';
+import { SiNotion } from 'react-icons/si'; // Notion Icon
 import { Eye, EyeOff } from 'lucide-react';
 import { AuthLayout } from '@/components/AuthLayout';
 
 export default function SignUpPage() {
   const supabase = createSupabaseBrowserClient();
   const toast = useToast();
+  
+  // State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -18,16 +43,38 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Theme Variables
   const boxBg = useColorModeValue('white', 'gray.900');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const brandColor = useColorModeValue('brand.600', 'brand.400');
+  const tealColor = useColorModeValue('teal.600', 'teal.400');
+  
+  // LOGO VISIBILITY LOGIC
+  const logoFilter = useColorModeValue(
+    'none', 
+    'brightness(0) invert(1) drop-shadow(0 0 5px rgba(49, 151, 149, 0.5))'
+  );
 
+  // Sign Up with Email
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
     setSuccess(null);
-    const { error } = await supabase.auth.signUp({ email, password });
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      setIsLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        emailRedirectTo: `${location.origin}/auth/callback`,
+      }
+    });
+
     if (error) {
       toast({ title: 'Sign-up Failed', description: error.message, status: 'error', duration: 5000, isClosable: true });
       setError(error.message);
@@ -39,43 +86,132 @@ export default function SignUpPage() {
     setIsLoading(false);
   };
 
-  const handleOAuthSignIn = async (provider: 'google' | 'github') => {
+  // OAuth Logic
+  // COMMANDER FIX: Typed as 'any' to accept 'linkedin_oidc'
+  const handleOAuthSignIn = async (provider: any) => {
     setIsLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${location.origin}/auth/callback` } });
-    if (error) toast({ title: 'Error', description: error.message, status: 'error' });
+    const { error } = await supabase.auth.signInWithOAuth({ 
+      provider, 
+      options: { redirectTo: `${location.origin}/auth/callback` } 
+    });
+    if (error) {
+      toast({ title: 'Connection Error', description: error.message, status: 'error' });
+      setIsLoading(false);
+    }
   };
 
   return (
     <AuthLayout>
-      <Box rounded="2xl" bg={boxBg} boxShadow="2xl" p={{ base: 6, md: 8 }} border="1px" borderColor={borderColor}>
-        <Heading fontSize="xl" mb={6} textAlign="center" fontWeight="bold" color={useColorModeValue('gray.700', 'white')}>
-          Join the Fleet
-        </Heading>
-        {success && (<Alert status="success" variant="subtle" mb={4} rounded="md"><AlertIcon />{success}</Alert>)}
-        {error && (<Alert status="error" variant="subtle" mb={4} rounded="md"><AlertIcon />{error}</Alert>)}
+      <Box 
+        rounded="2xl" 
+        bg={boxBg} 
+        boxShadow="2xl" 
+        p={{ base: 6, md: 8 }} 
+        border="1px" 
+        borderColor={borderColor}
+        maxW="md"
+        w="full"
+        mx="auto"
+      >
+        {/* LOGO HEADER */}
+        <VStack spacing={4} mb={6}>
+          <Box filter={logoFilter} transition="all 0.3s">
+            <Image src="/logo.svg" alt="QuotePilot" width={48} height={48} priority />
+          </Box>
+          <Heading fontSize="xl" textAlign="center" fontWeight="bold" color={useColorModeValue('gray.700', 'white')}>
+            Join the Fleet
+          </Heading>
+        </VStack>
+
+        {/* ALERTS */}
+        {success && (<Alert status="success" variant="subtle" mb={4} rounded="md" fontSize="sm"><AlertIcon />{success}</Alert>)}
+        {error && (<Alert status="error" variant="subtle" mb={4} rounded="md" fontSize="sm"><AlertIcon />{error}</Alert>)}
         
-        <Stack spacing={3} mb={6}>
-          <Button variant="outline" borderColor={borderColor} leftIcon={<Icon as={FaGoogle} />} onClick={() => handleOAuthSignIn('google')}>Sign up with Google</Button>
-          <Button variant="outline" borderColor={borderColor} leftIcon={<Icon as={FaGithub} />} onClick={() => handleOAuthSignIn('github')}>Sign up with GitHub</Button>
-        </Stack>
+        {/* OAUTH GRID */}
+        <SimpleGrid columns={2} spacing={3} mb={6}>
+          <Button 
+            variant="outline" 
+            borderColor={borderColor} 
+            leftIcon={<Icon as={FaGoogle} />} 
+            onClick={() => handleOAuthSignIn('google')}
+            fontSize="sm"
+          >
+            Google
+          </Button>
+          <Button 
+            variant="outline" 
+            borderColor={borderColor} 
+            leftIcon={<Icon as={FaGithub} />} 
+            onClick={() => handleOAuthSignIn('github')}
+            fontSize="sm"
+          >
+            GitHub
+          </Button>
+          <Button 
+            variant="outline" 
+            borderColor={borderColor} 
+            leftIcon={<Icon as={FaLinkedin} color="#0077b5" />} 
+            // COMMANDER CRITICAL FIX: 'linkedin_oidc'
+            onClick={() => handleOAuthSignIn('linkedin_oidc')}
+            fontSize="sm"
+          >
+            LinkedIn
+          </Button>
+          <Button 
+            variant="outline" 
+            borderColor={borderColor} 
+            leftIcon={<Icon as={FaTwitter} />} 
+            onClick={() => handleOAuthSignIn('twitter')}
+            fontSize="sm"
+          >
+            X (Twitter)
+          </Button>
+          <Button 
+            variant="outline" 
+            borderColor={borderColor} 
+            leftIcon={<Icon as={SiNotion} />} 
+            onClick={() => handleOAuthSignIn('notion')}
+            fontSize="sm"
+            gridColumn="span 2"
+            _hover={{ bg: useColorModeValue('gray.50', 'whiteAlpha.100') }}
+          >
+            Sign up with Notion
+          </Button>
+        </SimpleGrid>
         
+        {/* DIVIDER */}
         <Flex align="center" mb={6}>
             <Divider borderColor={borderColor} />
             <Text px={4} fontSize="xs" color="gray.500" fontWeight="bold">OR</Text>
             <Divider borderColor={borderColor} />
         </Flex>
         
+        {/* EMAIL FORM */}
         <form onSubmit={handleSignUp}>
           <Stack spacing={4}>
             <FormControl id="email-signup" isRequired>
               <FormLabel fontSize="sm">Email address</FormLabel>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" borderColor={borderColor} />
+              <Input 
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                placeholder="pilot@quotepilot.com" 
+                borderColor={borderColor}
+                focusBorderColor="teal.400" 
+              />
             </FormControl>
             
             <FormControl id="password-signup" isRequired>
               <FormLabel fontSize="sm">Password</FormLabel>
               <InputGroup size="md">
-                <Input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="6+ characters" borderColor={borderColor} />
+                <Input 
+                  type={showPassword ? 'text' : 'password'} 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="6+ characters" 
+                  borderColor={borderColor}
+                  focusBorderColor="teal.400"
+                />
                 <InputRightElement width="3rem">
                   <Button h="1.75rem" size="sm" onClick={() => setShowPassword(!showPassword)} variant="ghost">
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -84,12 +220,14 @@ export default function SignUpPage() {
               </InputGroup>
             </FormControl>
             
-            <Button width="full" colorScheme="brand" type="submit" isLoading={isLoading} size="lg">Create Account</Button>
+            <Button width="full" colorScheme="teal" type="submit" isLoading={isLoading} size="lg" shadow="md">
+              Create Account
+            </Button>
           </Stack>
         </form>
 
         <Text mt={6} textAlign="center" fontSize="sm" color="gray.500">
-          Already flying with us? <Link as={NextLink} href="/sign-in" color={brandColor} fontWeight="bold">Sign In</Link>
+          Already flying with us? <Link as={NextLink} href="/sign-in" color={tealColor} fontWeight="bold">Sign In</Link>
         </Text>
       </Box>
     </AuthLayout>

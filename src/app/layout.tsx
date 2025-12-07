@@ -6,8 +6,10 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Container, Flex } from '@chakra-ui/react';
 import AuthListener from '@/components/AuthListener';
+import BackToTop from '@/components/BackToTop';
 
-const siteUrl = 'https://app.coderon.co.za';
+
+const siteUrl = 'https://quotepilot.coderon.co.za/';
 
 export const metadata: Metadata = {
   title: 'QuotePilot - Professional Invoices & Quotes for Africa',
@@ -47,6 +49,7 @@ export default function RootLayout({ children }: Readonly<{ children: 'React.Rea
           </Flex>
         </Providers>
         <Analytics />
+        <BackToTop />
       </body>
     </html>
   );

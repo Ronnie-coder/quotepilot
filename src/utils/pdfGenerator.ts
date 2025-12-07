@@ -1,24 +1,37 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Buffer } from 'buffer';
 
-// // 1.0 TYPE DEFINITIONS
-interface PdfData {
+// 1.0 TYPE DEFINITIONS
+export interface PdfData {
   documentType: 'Invoice' | 'Quote';
+  brandColor?: string;
+  currency?: string; // <--- NEW: Dynamic Currency Code
   invoiceNumber?: string | null;
   invoiceDate?: string | null;
   dueDate?: string | null;
   logo?: string | null;
-  from: { name?: string | null; address?: string | null; email?: string | null };
-  to: { name?: string | null; address?: string | null; email?: string | null };
-  lineItems: { description: string; quantity: number; unitPrice: number }[];
+  from: {
+    name?: string | null;
+    address?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+  to: {
+    name?: string | null;
+    address?: string | null;
+    email?: string | null;
+  };
+  lineItems: {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
   notes?: string | null;
   vatRate?: number | null;
-  payment: {
+  payment?: {
     bankName?: string | null;
     accountHolder?: string | null;
     accNumber?: string | null;
-    accountType?: string | null;
     branchCode?: string | null;
   };
   subtotal: number;
@@ -26,239 +39,236 @@ interface PdfData {
   total: number;
 }
 
-// // 2.0 HELPERS
-const formatDisplayDate = (dateString?: string | null): string => {
-  if (!dateString) return 'N/A';
-  return new Date(dateString).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric'
-  });
+// 2.0 HELPERS
+
+// Dynamic Currency Formatter
+// Falls back to ZAR if undefined, or generic string if code is invalid
+const formatCurrency = (amount: number, currencyCode = 'ZAR') => {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 2,
+    }).format(amount);
+  } catch (e) {
+    // Fallback for weird currency codes
+    return `${currencyCode} ${amount.toFixed(2)}`;
+  }
 };
 
-const formatCurrency = (amount?: number | null): string => {
-  if (amount === null || typeof amount === 'undefined') return 'R 0.00';
-  return `R ${amount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatDate = (dateStr?: string | null) => {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-// // 3.0 THE GENERATOR ENGINE
-export const generatePdf = async (data: PdfData): Promise<{ pdfBase64: string; fileName: string }> => {
+// --- DIRECT FETCH TO BASE64 (Anti-CORS / Cache Busting) ---
+const getBase64FromUrl = async (url: string): Promise<string | null> => {
+  try {
+    // Appending timestamp to bypass browser caching issues with updated logos
+    const cleanUrl = `${url}?t=${new Date().getTime()}`; 
+    const response = await fetch(cleanUrl);
+    
+    if (!response.ok) throw new Error(`Failed to fetch logo: ${response.statusText}`);
+    const blob = await response.blob();
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => {
+        console.warn("Reader failed");
+        resolve(null);
+      }
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.warn("Logo PDF Generation Warning:", error);
+    return null;
+  }
+};
+
+// 3.0 THE GENERATOR ENGINE
+export const generatePdf = async (data: PdfData): Promise<Blob> => {
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-  // --- DESIGN TOKENS (TEAL IDENTITY) ---
-  const BRAND_COLOR = '#319795'; // QuotePilot Teal
-  const TEXT_PRIMARY = '#1A202C'; // Gray.900
-  const TEXT_SECONDARY = '#718096'; // Gray.500
-  const TEXT_LIGHT = '#FFFFFF';
-  const BORDER_COLOR = '#E2E8F0';
-
-  const margin = { top: 20, right: 20, bottom: 20, left: 20 };
-  const page = { width: doc.internal.pageSize.getWidth(), height: doc.internal.pageSize.getHeight() };
+  // --- BRAND IDENTITY ---
+  // Uses the passed color, or defaults to QuotePilot Teal
+  const COLOR_PRIMARY = data.brandColor || '#319795'; 
+  const COLOR_TEXT_MAIN = '#1A202C'; 
+  const COLOR_TEXT_MUTED = '#718096'; 
+  const CURRENCY = data.currency || 'ZAR'; // Uses dynamic currency
   
-  let yPos = margin.top;
+  const margin = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let yPos = margin;
 
-  // --- 1. HEADER SECTOR ---
-  // Logo Handling (Left Side)
+  // --- 1. HEADER & LOGO ---
   if (data.logo) {
-    try {
-      // NOTE: Using fetch to bypass potential CORS issues
-      const response = await fetch(data.logo);
-      if (response.ok) {
-        const imageBuffer = await response.arrayBuffer();
-        const imageUint8Array = new Uint8Array(imageBuffer);
-        
-        const imgProps = doc.getImageProperties(imageUint8Array);
-        const aspectRatio = imgProps.width / imgProps.height;
-        const maxLogoHeight = 18;
-        let logoWidth = maxLogoHeight * aspectRatio;
-        
-        // Cap width if logo is extremely wide
-        if (logoWidth > 60) {
-            logoWidth = 60;
-            // Recalculate height based on max width
-            const logoHeight = logoWidth / aspectRatio;
-            doc.addImage(imageUint8Array, 'PNG', margin.left, yPos, logoWidth, logoHeight);
-        } else {
-            doc.addImage(imageUint8Array, 'PNG', margin.left, yPos, logoWidth, maxLogoHeight);
+    const base64Img = await getBase64FromUrl(data.logo);
+    
+    if (base64Img) {
+        try {
+          const imgProps = doc.getImageProperties(base64Img);
+          const pdfWidth = 40; 
+          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          doc.addImage(base64Img, 'PNG', margin, yPos, pdfWidth, pdfHeight);
+        } catch (err) {
+          console.warn("Error adding image to PDF:", err);
         }
-      }
-    } catch (e) {
-      console.warn("Logo Fetch Warning:", e);
     }
   }
 
-  // Document Title & Meta (Right Side)
+  // Document Title
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(24);
-  doc.setTextColor(BRAND_COLOR);
-  doc.text(data.documentType.toUpperCase(), page.width - margin.right, yPos + 8, { align: 'right' });
+  doc.setTextColor(COLOR_PRIMARY);
+  doc.text(data.documentType.toUpperCase(), pageWidth - margin, yPos + 10, { align: 'right' });
 
+  // Meta Data
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.setTextColor(TEXT_SECONDARY);
-  doc.text(`#${data.invoiceNumber || 'DRAFT'}`, page.width - margin.right, yPos + 14, { align: 'right' });
+  doc.setTextColor(COLOR_TEXT_MUTED);
   
-  if (data.invoiceDate) {
-    doc.text(`Issued: ${formatDisplayDate(data.invoiceDate)}`, page.width - margin.right, yPos + 19, { align: 'right' });
+  doc.text(`#${data.invoiceNumber || 'DRAFT'}`, pageWidth - margin, yPos + 18, { align: 'right' });
+  doc.text(`Date: ${formatDate(data.invoiceDate)}`, pageWidth - margin, yPos + 23, { align: 'right' });
+  
+  if (data.documentType === 'Invoice' && data.dueDate) {
+    doc.text(`Due: ${formatDate(data.dueDate)}`, pageWidth - margin, yPos + 28, { align: 'right' });
   }
-  if (data.dueDate && data.documentType === 'Invoice') {
-    doc.text(`Due: ${formatDisplayDate(data.dueDate)}`, page.width - margin.right, yPos + 24, { align: 'right' });
-  }
 
-  yPos += 35; // Advance
+  yPos += 45; 
 
-  // --- 2. ADDRESS SECTOR ---
-  // From (Left)
+  // --- 2. ADDRESSES ---
+  const colWidth = (pageWidth - (margin * 2)) / 2;
+
+  // FROM
   doc.setFontSize(8);
-  doc.setTextColor(BRAND_COLOR);
+  doc.setTextColor(COLOR_PRIMARY);
   doc.setFont('helvetica', 'bold');
-  doc.text('FROM', margin.left, yPos);
-  
-  doc.setFontSize(10);
-  doc.setTextColor(TEXT_PRIMARY);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.from.name || '', margin.left, yPos + 5);
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(TEXT_SECONDARY);
-  const fromAddress = doc.splitTextToSize(data.from.address || '', 80);
-  doc.text(fromAddress, margin.left, yPos + 10);
-  doc.text(data.from.email || '', margin.left, yPos + 10 + (fromAddress.length * 4));
-
-  // To (Left - Offset)
-  const toY = yPos + 25 + (fromAddress.length * 2); // Dynamic spacing based on address length
-  
-  doc.setFontSize(8);
-  doc.setTextColor(BRAND_COLOR);
-  doc.setFont('helvetica', 'bold');
-  doc.text('BILL TO', margin.left, toY);
+  doc.text('FROM', margin, yPos);
 
   doc.setFontSize(10);
-  doc.setTextColor(TEXT_PRIMARY);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.to.name || 'Valued Client', margin.left, toY + 5);
-
+  doc.setTextColor(COLOR_TEXT_MAIN);
+  doc.text(data.from.name || '', margin, yPos + 5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(TEXT_SECONDARY);
-  const toAddress = doc.splitTextToSize(data.to.address || '', 80);
-  doc.text(toAddress, margin.left, toY + 10);
-  doc.text(data.to.email || '', margin.left, toY + 10 + (toAddress.length * 4));
+  doc.setTextColor(COLOR_TEXT_MUTED);
+  
+  const fromAddress = doc.splitTextToSize(data.from.address || '', colWidth - 5);
+  doc.text(fromAddress, margin, yPos + 10);
+  doc.text(data.from.email || '', margin, yPos + 10 + (fromAddress.length * 4));
 
-  yPos = Math.max(toY + 25, yPos + 30); 
+  // TO
+  doc.setFontSize(8);
+  doc.setTextColor(COLOR_PRIMARY);
+  doc.setFont('helvetica', 'bold');
+  doc.text('BILL TO', margin + colWidth, yPos);
 
-  // --- 3. THE ITEM TABLE ---
+  doc.setFontSize(10);
+  doc.setTextColor(COLOR_TEXT_MAIN);
+  doc.text(data.to.name || '', margin + colWidth, yPos + 5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(COLOR_TEXT_MUTED);
+  
+  const toAddress = doc.splitTextToSize(data.to.address || '', colWidth - 5);
+  doc.text(toAddress, margin + colWidth, yPos + 10);
+  doc.text(data.to.email || '', margin + colWidth, yPos + 10 + (toAddress.length * 4));
+
+  yPos = Math.max(yPos + 30, yPos + 15 + (Math.max(fromAddress.length, toAddress.length) * 4));
+
+  // --- 3. ITEMS TABLE ---
+  // We use the dynamic formatter for Unit Price and Total columns
+  const tableData = data.lineItems.map(item => [
+    item.description,
+    item.quantity.toString(),
+    formatCurrency(item.unitPrice, CURRENCY),
+    formatCurrency(item.quantity * item.unitPrice, CURRENCY)
+  ]);
+
   autoTable(doc, {
     startY: yPos,
-    head: [['ITEM DESCRIPTION', 'QTY', 'RATE', 'AMOUNT']],
-    body: (data.lineItems || []).map(item => [
-      item.description,
-      item.quantity,
-      formatCurrency(item.unitPrice),
-      formatCurrency(item.quantity * item.unitPrice)
-    ]),
+    head: [['Description', 'Qty', 'Price', 'Total']],
+    body: tableData,
     theme: 'grid',
-    styles: {
-      font: 'helvetica',
-      fontSize: 9,
-      textColor: TEXT_PRIMARY,
-      lineColor: BORDER_COLOR,
-      cellPadding: 3,
-    },
-    headStyles: {
-      fillColor: BRAND_COLOR, // Teal Header
-      textColor: TEXT_LIGHT,
-      fontStyle: 'bold',
-      halign: 'right', // Default right align for numbers
-    },
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: COLOR_TEXT_MAIN },
+    headStyles: { fillColor: COLOR_PRIMARY, textColor: '#FFFFFF', fontStyle: 'bold' },
     columnStyles: {
-      0: { halign: 'left', cellWidth: 'auto' }, // Description Left
-      1: { halign: 'center' }, // Qty Center
-      2: { halign: 'right' }, // Rate Right
-      3: { halign: 'right', fontStyle: 'bold' }, // Amount Right & Bold
+      0: { cellWidth: 'auto' },
+      1: { halign: 'center', cellWidth: 20 },
+      2: { halign: 'right', cellWidth: 30 },
+      3: { halign: 'right', cellWidth: 30, fontStyle: 'bold' }
     },
-    margin: { left: margin.left, right: margin.right },
+    margin: { left: margin, right: margin }
   });
 
-  // --- 4. FINANCIAL SUMMARY ---
-  let finalY = (doc as any).lastAutoTable.finalY + 10;
-  const summaryX = page.width - margin.right;
+  // --- 4. TOTALS & NOTES ---
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  const rightColX = pageWidth - margin - 40;
 
-  // Notes (Left side)
   if (data.notes) {
     doc.setFontSize(8);
-    doc.setTextColor(BRAND_COLOR);
+    doc.setTextColor(COLOR_PRIMARY);
     doc.setFont('helvetica', 'bold');
-    doc.text('NOTES', margin.left, finalY);
+    doc.text('NOTES / TERMS', margin, finalY);
     
     doc.setFontSize(9);
-    doc.setTextColor(TEXT_SECONDARY);
+    doc.setTextColor(COLOR_TEXT_MUTED);
     doc.setFont('helvetica', 'normal');
-    const notesLines = doc.splitTextToSize(data.notes, 100);
-    doc.text(notesLines, margin.left, finalY + 5);
+    const noteLines = doc.splitTextToSize(data.notes, 100);
+    doc.text(noteLines, margin, finalY + 5);
   }
 
-  // Totals (Right side)
   doc.setFontSize(10);
-  doc.setTextColor(TEXT_SECONDARY);
-  doc.text('Subtotal:', summaryX - 40, finalY, { align: 'right' });
-  doc.text(formatCurrency(data.subtotal), summaryX, finalY, { align: 'right' });
+  doc.setTextColor(COLOR_TEXT_MUTED);
+  doc.text('Subtotal:', rightColX, finalY, { align: 'right' });
+  doc.text(formatCurrency(data.subtotal, CURRENCY), pageWidth - margin, finalY, { align: 'right' });
 
   if (data.vatRate && data.vatRate > 0) {
-    doc.text(`VAT (${data.vatRate}%):`, summaryX - 40, finalY + 6, { align: 'right' });
-    doc.text(formatCurrency(data.vatAmount), summaryX, finalY + 6, { align: 'right' });
+    doc.text(`VAT (${data.vatRate}%):`, rightColX, finalY + 5, { align: 'right' });
+    doc.text(formatCurrency(data.vatAmount, CURRENCY), pageWidth - margin, finalY + 5, { align: 'right' });
   }
 
-  // Grand Total
   doc.setFontSize(14);
-  doc.setTextColor(BRAND_COLOR); // Teal Total
   doc.setFont('helvetica', 'bold');
-  doc.text('Total:', summaryX - 40, finalY + 14, { align: 'right' });
-  doc.text(formatCurrency(data.total), summaryX, finalY + 14, { align: 'right' });
+  doc.setTextColor(COLOR_PRIMARY);
+  doc.text('Total:', rightColX, finalY + 15, { align: 'right' });
+  doc.text(formatCurrency(data.total, CURRENCY), pageWidth - margin, finalY + 15, { align: 'right' });
 
-  // --- 5. BANKING & FOOTER ---
-  const footerY = page.height - margin.bottom - 25;
+  // --- 5. FOOTER & WATERMARK ---
+  const footerY = pageHeight - margin;
+
+  if (data.payment && (data.payment.bankName || data.payment.accNumber)) {
+    doc.setFontSize(8);
+    doc.setTextColor(COLOR_PRIMARY);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT DETAILS', margin, footerY - 15);
+    
+    doc.setTextColor(COLOR_TEXT_MAIN);
+    doc.setFont('helvetica', 'normal');
+    
+    const parts = [
+        data.payment.bankName,
+        data.payment.accountHolder,
+        data.payment.accNumber ? `Acc: ${data.payment.accNumber}` : null,
+        data.payment.branchCode ? `Branch: ${data.payment.branchCode}` : null
+    ].filter(Boolean);
+    
+    doc.text(parts.join(' | '), margin, footerY - 10);
+  }
   
-  // Banking Line
-  doc.setDrawColor(BORDER_COLOR);
-  doc.line(margin.left, footerY - 5, page.width - margin.right, footerY - 5);
-  
-  doc.setFontSize(8);
-  doc.setTextColor(BRAND_COLOR);
+  // Brand Watermark
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('PAYMENT DETAILS', margin.left, footerY);
-  
-  doc.setFontSize(8);
-  doc.setTextColor(TEXT_SECONDARY);
-  doc.setFont('helvetica', 'normal');
-  
-  // Robust Join Logic for Banking
-  const bankDetails = [
-    data.payment.bankName,
-    data.payment.accountHolder,
-    data.payment.accNumber ? `Acc: ${data.payment.accNumber}` : null,
-    data.payment.branchCode ? `Branch: ${data.payment.branchCode}` : null
-  ].filter(Boolean).join('  |  ');
-  
-  doc.text(bankDetails, margin.left, footerY + 5);
+  doc.setTextColor(COLOR_PRIMARY); 
+  doc.text('QuotePilot', pageWidth - margin, footerY - 14, { align: 'right' });
 
-  // --- 6. VIRAL WATERMARK (PRODUCT-LED GROWTH) ---
-  const watermarkY = page.height - 10;
-  
   doc.setFontSize(8);
-  // Using Gray for the watermark text to be professional, not intrusive
-  doc.setTextColor(TEXT_SECONDARY); 
-  doc.setFont('helvetica', 'normal');
-  const watermarkText = "Powered by QuotePilot - Create your own professional invoices for free.";
-  const textWidth = doc.getTextWidth(watermarkText);
-  const xPos = (page.width - textWidth) / 2;
-  
-  doc.text(watermarkText, xPos, watermarkY);
-  
-  // ADD LINK OVERLAY (The Homing Beacon)
-  doc.link(xPos, watermarkY - 3, textWidth, 5, { url: 'https://quotepilot.coderon.co.za' });
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(COLOR_TEXT_MUTED);
+  doc.text("Building Africa's Ambition, One Invoice at a Time.", pageWidth - margin, footerY - 10, { align: 'right' });
 
-  // --- OUTPUT ---
-  const fileName = `${data.documentType}_${data.invoiceNumber || 'DRAFT'}.pdf`;
-  const pdfArrayBuffer = doc.output('arraybuffer');
-  const pdfBase64 = Buffer.from(pdfArrayBuffer).toString('base64');
-  
-  return { pdfBase64, fileName };
+  // Add Link
+  const textWidth = doc.getTextWidth("Building Africa's Ambition, One Invoice at a Time.");
+  doc.link(pageWidth - margin - textWidth, footerY - 20, textWidth, 20, { url: 'https://quotepilot.coderon.co.za' });
+
+  return doc.output('blob');
 };

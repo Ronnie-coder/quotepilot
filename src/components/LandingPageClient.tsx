@@ -25,12 +25,22 @@ export default function LandingPageClient() {
   const floatCardRef = useRef<HTMLDivElement>(null);
 
   const textColor = useColorModeValue('gray.600', 'gray.300');
-  const brandColor = useColorModeValue('brand.600', 'brand.300');
-  const blobColor = useColorModeValue('brand.100', 'brand.900');
+  const brandColor = useColorModeValue('brand.600', 'brand.300'); // Ensure 'brand' colors exist in theme.ts, otherwise fallback to teal.500
+  const blobColor = useColorModeValue('teal.100', 'teal.900'); // Explicit Teal alignment
   
   // Glass Card Styles
-  const cardBg = useColorModeValue('rgba(255, 255, 255, 0.9)', 'rgba(32, 34, 46, 0.8)');
+  const cardBg = useColorModeValue('rgba(255, 255, 255, 0.9)', 'rgba(23, 25, 35, 0.8)');
   const cardBorder = useColorModeValue('gray.100', 'whiteAlpha.100');
+
+  // SMOOTH SCROLL HANDLER
+  const scrollToFeatures = () => {
+    const featuresSection = document.getElementById('features');
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      console.warn("Commander Warning: 'features' ID not found. Ensure Features.tsx has id='features'");
+    }
+  };
 
   useEffect(() => {
     const cyclingWords = ['Invoice', 'Quote', 'Proposal'];
@@ -62,7 +72,7 @@ export default function LandingPageClient() {
         ease: 'sine.inOut',
       });
       
-      // 3. Dynamic Headline (Fixed Gap Issue)
+      // 3. Dynamic Headline
       const wordTl = gsap.timeline({ repeat: -1, repeatDelay: 2.5 });
       wordTl.to(wordRef.current, {
         duration: 0.4,
@@ -91,10 +101,11 @@ export default function LandingPageClient() {
         ease: "power1.inOut"
       });
 
-      // 5. Parallax Effect
+      // 5. Parallax Effect (Mouse Movement)
       const handleMouseMove = (e: MouseEvent) => {
         if (!contentRef.current || !blobRef.current) return;
         const { clientX, clientY } = e;
+        // Normalize coordinates
         const x = (clientX / window.innerWidth - 0.5) * 2;
         const y = (clientY / window.innerHeight - 0.5) * 2;
 
@@ -141,7 +152,7 @@ export default function LandingPageClient() {
             width="120%"
             height="120%"
             bgGradient={`radial(${blobColor} 0%, transparent 60%)`}
-            opacity={useColorModeValue(0.5, 0.2)}
+            opacity={useColorModeValue(0.5, 0.15)} 
             zIndex={-1}
             pointerEvents="none"
         />
@@ -159,10 +170,17 @@ export default function LandingPageClient() {
           <Box ref={contentRef} position="relative" w="full">
             <VStack spacing={8} textAlign="center" alignItems="center">
               
-              {/* SOCIAL PROOF (Text Only) */}
+              {/* SOCIAL PROOF */}
               <Box className="hero-animate">
-                <HStack spacing={2} bg={useColorModeValue('whiteAlpha.600', 'whiteAlpha.100')} px={4} py={1.5} rounded="full" border="1px solid" borderColor={useColorModeValue('gray.200', 'whiteAlpha.200')}>
-                  <Icon as={Users} size={14} color={brandColor} />
+                <HStack 
+                  spacing={2} 
+                  bg={useColorModeValue('whiteAlpha.600', 'whiteAlpha.100')} 
+                  px={4} py={1.5} 
+                  rounded="full" 
+                  border="1px solid" 
+                  borderColor={useColorModeValue('gray.200', 'whiteAlpha.200')}
+                >
+                  <Icon as={Users} size={16} color="teal.500" />
                   <Text fontSize="xs" fontWeight="bold" color={textColor}>
                     Joined by 10+ Early Pilots
                   </Text>
@@ -179,7 +197,7 @@ export default function LandingPageClient() {
                       lineHeight="1.1"
                   >
                     Building Africa&apos;s Ambition,<br />
-                    One <Box as="span" color={brandColor} display="inline-block"><span ref={wordRef}>Invoice</span></Box> at a Time.
+                    One <Box as="span" color="teal.400" display="inline-block" minW="180px"><span ref={wordRef}>Invoice</span></Box> at a Time.
                   </Heading>
               </Box>
 
@@ -206,7 +224,7 @@ export default function LandingPageClient() {
                 <Button 
                   as={NextLink} 
                   href="/sign-up" 
-                  colorScheme="brand" 
+                  colorScheme="teal" 
                   size="lg" 
                   h={14}
                   px={10} 
@@ -214,14 +232,16 @@ export default function LandingPageClient() {
                   w={{ base: 'full', sm: 'auto' }}
                   rightIcon={<Icon as={ArrowRight} />}
                   boxShadow="lg"
-                  _hover={{ transform: 'translateY(-2px)', boxShadow: 'xl' }}
+                  _hover={{ 
+                    transform: 'translateY(-2px)', 
+                    boxShadow: '0 0 20px rgba(49, 151, 149, 0.5)' // Teal Glow on Hover
+                  }}
                 >
                   Start Flying Free
                 </Button>
                 
                 <Button 
-                  as={NextLink}
-                  href="#features"
+                  onClick={scrollToFeatures} // ATTACHED SCROLL HANDLER HERE
                   variant="outline" 
                   size="lg"
                   h={14}
@@ -243,8 +263,7 @@ export default function LandingPageClient() {
               <Box 
                 className="hero-animate" 
                 mt={16} 
-                // FIX APPLIED: Moved perspective into sx prop
-                sx={{ perspective: '1000px' }}
+                sx={{ perspective: '1000px' }} // Ensures 3D effect works
               >
                  <Box
                     ref={floatCardRef}
@@ -259,8 +278,7 @@ export default function LandingPageClient() {
                     mx="auto"
                     position="relative"
                     textAlign="left"
-                    // Slight initial tilt
-                    transform="rotateX(10deg) rotateY(-10deg)"
+                    transformStyle="preserve-3d"
                  >
                     {/* Fake Invoice UI */}
                     <Flex justify="space-between" align="center" mb={4}>
@@ -277,7 +295,7 @@ export default function LandingPageClient() {
                     </Flex>
                     
                     <Box h="2px" bg="gray.100" my={4} position="relative" overflow="hidden" rounded="full">
-                         <Box position="absolute" top={0} left={0} h="full" w="100%" bg="brand.400" />
+                         <Box position="absolute" top={0} left={0} h="full" w="100%" bg="teal.400" />
                     </Box>
 
                     <HStack justify="space-between" fontSize="xs" color="gray.500">
