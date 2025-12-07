@@ -2,9 +2,9 @@
 
 **QuotePilot is a streamlined, open-source quoting application designed for freelancers and small businesses. Create, manage, and send professional client quotes with ease.**
 
-![QuotePilot Dashboard Screenshot](https://app.coderon.co.za/placeholder-image.jpg) 
+![QuotePilot Dashboard Screenshot](https://quotepilot.coderon.co.za/placeholder-image.jpg) 
 
-Live Application:[app.coderon.co.za](https://app.coderon.co.za)
+Live Application:[app.coderon.co.za](https://quotepilot.coderon.co.za/)
 
 ---
 
