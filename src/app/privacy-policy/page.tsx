@@ -7,45 +7,77 @@ export default function PrivacyPolicyPage() {
         <Heading as="h1" size="2xl">Privacy Policy</Heading>
         <Text>Last Updated: {new Date().toLocaleDateString()}</Text>
 
-        <Text>Coderon (Pty) Ltd ("us", "we", or "our") operates the QuotePilot web application (the "Service"). This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service and the choices you have associated with that data, in compliance with the Protection of Personal Information Act (POPIA) of South Africa.</Text>
+        <Text>
+          CODERON (“us”, “we”, or “our”) operates the QuotePilot web application
+          (the “Service”). This Privacy Policy explains how we collect, store, use, and
+          protect your personal information in accordance with the Protection of Personal
+          Information Act (POPIA) of South Africa.
+        </Text>
 
-        <Heading as="h2" size="lg" mt={4}>1. Information Collection and Use</Heading>
-        <Text>We collect several different types of information for various purposes to provide and improve our Service to you.</Text>
+        <Heading as="h2" size="lg" mt={4}>1. Information We Collect</Heading>
+        <Text>We collect different types of information to provide and improve the Service:</Text>
         <UnorderedList spacing={2} pl={6}>
-          <ListItem><Text as="strong">Personal Data:</Text> While using our Service, we may ask you to provide us with certain personally identifiable information, including but not limited to: Email address, Full name, Company name, and Financial data related to invoices and quotes.</ListItem>
-          <ListItem><Text as="strong">Usage Data:</Text> We may collect information on how the Service is accessed and used. This Usage Data may include information such as your computer's IP address, browser type, and browser version.</ListItem>
+          <ListItem>
+            <Text as="strong">Personal Data:</Text> Includes information such as your full name,
+            email address, company name, billing details, and invoice/quote financial data.
+          </ListItem>
+          <ListItem>
+            <Text as="strong">Usage Data:</Text> Includes IP address, browser type, device
+            information, and interactions with the Service.
+          </ListItem>
         </UnorderedList>
 
-        <Heading as="h2" size="lg" mt={4}>2. Use of Data</Heading>
-        <Text>QuotePilot uses the collected data for various purposes:</Text>
+        <Heading as="h2" size="lg" mt={4}>2. How We Use Your Data</Heading>
+        <Text>QuotePilot uses collected information for the following purposes:</Text>
         <UnorderedList spacing={2} pl={6}>
-            <ListItem>To provide and maintain our Service</ListItem>
-            <ListItem>To notify you about changes to our Service</ListItem>
-            <ListItem>To provide customer support</ListItem>
-            <ListItem>To monitor the usage of our Service</ListItem>
-            <ListItem>To detect, prevent and address technical issues</ListItem>
+          <ListItem>To provide, maintain, and improve our Service</ListItem>
+          <ListItem>To notify you about updates or changes</ListItem>
+          <ListItem>To provide customer and technical support</ListItem>
+          <ListItem>To monitor and analyze usage</ListItem>
+          <ListItem>To detect, prevent, and resolve technical issues</ListItem>
         </UnorderedList>
 
         <Heading as="h2" size="lg" mt={4}>3. Data Storage and Security</Heading>
-        <Text>Your information is securely stored using Supabase, our backend service provider. The security of your data is important to us, but remember that no method of transmission over the Internet or method of electronic storage is 100% secure.</Text>
+        <Text>
+          Your data is securely stored through Supabase, our backend provider. We take
+          reasonable technical and organizational measures to protect your information.
+          However, no method of transmission or storage over the Internet is completely secure.
+        </Text>
 
-        <Heading as="h2" size="lg" mt={4}>4. Your Data Protection Rights under POPIA</Heading>
-        <Text>As a South African user, you have the right to:</Text>
+        <Heading as="h2" size="lg" mt={4}>4. Your Rights Under POPIA</Heading>
+        <Text>You have the legal right to:</Text>
         <UnorderedList spacing={2} pl={6}>
-            <ListItem>Request access to the personal information we hold about you.</ListItem>
-            <ListItem>Request the correction of inaccurate personal information.</ListItem>
-            <ListItem>Object to the processing of your personal information.</ListItem>
-            <ListItem>Request the deletion of your personal information.</ListItem>
+          <ListItem>Request access to the personal information we hold about you</ListItem>
+          <ListItem>Request corrections to inaccurate personal information</ListItem>
+          <ListItem>Object to the processing of your personal data</ListItem>
+          <ListItem>Request the deletion of your personal information</ListItem>
         </UnorderedList>
 
         <Heading as="h2" size="lg" mt={4}>5. Service Providers</Heading>
-        <Text>We use third-party services for authentication (Google, GitHub) and analytics (Vercel Analytics). These third parties have access to your Personal Data only to perform these tasks on our behalf and are obligated not to disclose or use it for any other purpose.</Text>
+        <Text>
+          We use trusted third-party providers such as Google and GitHub for authentication,
+          and Vercel Analytics for performance and usage insights. These providers are
+          contracted to process data only on our behalf and are prohibited from using it for
+          any other purpose.
+        </Text>
 
         <Heading as="h2" size="lg" mt={4}>6. Changes to This Privacy Policy</Heading>
-        <Text>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</Text>
+        <Text>
+          We may update this Privacy Policy periodically. Any changes will be posted on this
+          page, and the “Last Updated” date will be revised accordingly.
+        </Text>
 
         <Heading as="h2" size="lg" mt={4}>7. Contact Us</Heading>
-        <Text>If you have any questions about this Privacy Policy, please contact us at ronnie@coderon.co.za.</Text>
+        <Text>
+          If you have any questions about this Privacy Policy or your personal information,
+          please contact us:
+        </Text>
+
+        <UnorderedList spacing={2} pl={6}>
+          <ListItem>Email: support@coderon.co.za</ListItem>
+          <ListItem>Phone/WhatsApp: 067 818 4898</ListItem>
+          <ListItem>General enquiries: info@coderon.co.za</ListItem>
+        </UnorderedList>
       </VStack>
     </Container>
   );
