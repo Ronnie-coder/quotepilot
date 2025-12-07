@@ -32,24 +32,22 @@ import { InvoiceFormData } from '@/types/invoice';
 import { createQuoteAction, updateQuoteAction } from '@/app/dashboard/quotes/actions';
 import { generatePdf } from '@/utils/pdfGenerator'; 
 
-// 🟢 COMMANDER FIX: Comprehensively extend the profile type to include ALL potential missing fields
-// This prevents "Property does not exist" errors for banking and contact details.
-type ExtendedClient = Tables<'clients'> & { currency?: string };
+// 🟢 COMMANDER FIX: Allow 'null' for all extended fields to match Supabase response types
+// This resolves the "Type 'string | null' is not assignable to type 'string | undefined'" error.
+type ExtendedClient = Tables<'clients'> & { currency?: string | null };
 type ExtendedProfile = Tables<'profiles'> & { 
-    currency?: string; 
-    email?: string;
-    // Banking details
-    bank_name?: string;
-    account_holder?: string;
-    account_number?: string;
-    branch_code?: string;
-    branch_name?: string;
-    account_type?: string;
-    // Company details
-    logo_url?: string;
-    company_name?: string;
-    company_address?: string;
-    terms_conditions?: string;
+    currency?: string | null; 
+    email?: string | null;
+    bank_name?: string | null;
+    account_holder?: string | null;
+    account_number?: string | null;
+    branch_code?: string | null;
+    branch_name?: string | null;
+    account_type?: string | null;
+    logo_url?: string | null;
+    company_name?: string | null;
+    company_address?: string | null;
+    terms_conditions?: string | null;
 };
 
 type InvoiceFormProps = {
@@ -77,7 +75,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isNewClient, setIsNewClient] = useState(!defaultValues?.client_id && clients?.length > 0);
   
-  // 🟢 COMMANDER FIX: Cast defaultValues to any to avoid "property currency does not exist" error
   const [activeCurrency, setActiveCurrency] = useState((defaultValues as any)?.currency || profile?.currency || 'ZAR');
 
   const toast = useToast();
@@ -99,7 +96,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
 
   // --- DYNAMIC CURRENCY SWITCHER ---
   useEffect(() => {
-    // 🟢 COMMANDER FIX: Cast here as well
     if (isEditing && (defaultValues as any)?.currency) return;
 
     if (isNewClient) {
@@ -135,7 +131,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       });
       if(client) setIsNewClient(false);
       
-      // 🟢 COMMANDER FIX: Cast here as well
       if((defaultValues as any).currency) setActiveCurrency((defaultValues as any).currency);
     } else {
       reset({
@@ -182,18 +177,31 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     setIsGeneratingPdf(true);
     try {
       const formData = getValues();
+      
+      // 🟢 COMMANDER FIX: Convert potential nulls to undefined to satisfy pdfGenerator types
+      const safeProfile = {
+        logo: profile?.logo_url || undefined,
+        name: profile?.company_name || undefined,
+        email: profile?.email || undefined,
+        address: profile?.company_address || undefined,
+        bankName: profile?.bank_name || undefined,
+        accountHolder: profile?.account_holder || undefined,
+        accNumber: profile?.account_number || undefined,
+        branchCode: profile?.branch_code || undefined
+      };
+
       const blob = await generatePdf({
         documentType,
         brandColor: formData.brandColor,
         invoiceNumber: formData.invoiceNumber,
         invoiceDate: formData.invoiceDate,
         dueDate: formData.dueDate,
-        logo: profile?.logo_url,
+        logo: safeProfile.logo,
         currency: activeCurrency, 
         from: {
-          name: profile?.company_name,
-          email: profile?.email,
-          address: profile?.company_address,
+          name: safeProfile.name,
+          email: safeProfile.email,
+          address: safeProfile.address,
         },
         to: formData.to,
         lineItems: formData.lineItems.map(item => ({
@@ -207,14 +215,10 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         vatAmount,
         total,
         payment: {
-            // 🟢 COMMANDER FIX: Accessing banking details is now safe via ExtendedProfile
-            bankName: profile?.bank_name,
-            accountHolder: profile?.account_holder,
-            accNumber: profile?.account_number,
-            branchCode: profile?.branch_code,
-            // Including others just in case the PDF generator uses them later
-            accountType: profile?.account_type, 
-            branchName: profile?.branch_name
+            bankName: safeProfile.bankName,
+            accountHolder: safeProfile.accountHolder,
+            accNumber: safeProfile.accNumber,
+            branchCode: safeProfile.branchCode,
         }
       });
 
@@ -368,7 +372,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
                     <option value="GBP">GBP (£)</option>
                     <option value="NGN">NGN (₦)</option>
                     <option value="KES">KES (KSh)</option>
-                    <option value="GHS">GHS (₵)</option>
+                                        <option value="GHS">GHS (₵)</option>
                     <option value="NAD">NAD (N$)</option>
                     <option value="BWP">BWP (P)</option>
                 </Select>
