@@ -20,13 +20,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!quote) return { title: 'QuotePilot Document' };
 
-  // Handle array/object quirk for profiles
-  const company = quote.profiles 
-    ? (Array.isArray(quote.profiles) ? quote.profiles[0].company_name : quote.profiles.company_name) 
-    : 'Freelancer';
-    
-  const type = quote.document_type || 'Invoice';
-  const number = quote.invoice_number;
+  // 🟢 FIX: Cast to 'any' to bypass TypeScript "never" error on joined relations
+  const anyQuote = quote as any;
+
+  // Handle array/object quirk for profiles safely
+  const profileData = Array.isArray(anyQuote.profiles) 
+    ? anyQuote.profiles[0] 
+    : anyQuote.profiles;
+
+  const company = profileData?.company_name || 'Freelancer';
+  const type = anyQuote.document_type || 'Invoice';
+  const number = anyQuote.invoice_number;
 
   return {
     title: `${type} #${number} from ${company}`,
