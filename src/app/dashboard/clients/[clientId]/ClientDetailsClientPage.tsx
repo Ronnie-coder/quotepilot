@@ -5,17 +5,19 @@ import {
   SimpleGrid, Stat, StatLabel, StatNumber, StatHelpText, 
   Table, Thead, Tbody, Tr, Th, Td, Badge, 
   useColorModeValue, Card, CardBody, Avatar, Divider, HStack,
-  IconButton, Tooltip, VStack
+  IconButton, VStack, useDisclosure
 } from '@chakra-ui/react';
 import { 
   ArrowLeft, Plus, Mail, Phone, MapPin, 
-  FileText, CheckCircle2, AlertCircle, Clock 
+  FileText, CheckCircle2, AlertCircle, Clock, Edit
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-// Note: Ensure this path is correct based on your project structure
-import { DeleteClientButton } from '../../clients/DeleteClientButton'; 
-import { formatCurrency } from '@/utils/formatCurrency'; // <--- NEW IMPORT
+import { useState, useEffect } from 'react'; // 🟢 Added Hooks
+import { formatCurrency } from '@/utils/formatCurrency'; 
+import ShareInvoice from '@/components/ShareInvoice'; 
+// 🟢 Import your Modal
+import EditClientModal from '@/components/EditClientModal'; 
 
 interface Props {
   client: any;
@@ -30,6 +32,23 @@ interface Props {
 
 export default function ClientDetailsClientPage({ client, documents, stats }: Props) {
   const router = useRouter();
+  
+  // 🟢 1. Local State for Client Data (allows instant UI updates)
+  const [clientData, setClientData] = useState(client);
+  
+  // 🟢 2. Modal Controls
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
+  // Sync state if server prop changes (rare but good practice)
+  useEffect(() => {
+    setClientData(client);
+  }, [client]);
+
+  // 🟢 3. Handle Update Success
+  const handleClientUpdated = (updatedClient: any) => {
+    setClientData(updatedClient); // Update UI immediately
+    router.refresh(); // Sync server data in background
+  };
   
   // Theme
   const bgCard = useColorModeValue('white', 'gray.800');
@@ -48,10 +67,10 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
           variant="ghost"
         />
         <Box>
-          <Heading size="lg" color={headingColor}>{client.name}</Heading>
+          <Heading size="lg" color={headingColor}>{clientData.name}</Heading>
           <HStack spacing={2} color={mutedText} fontSize="sm">
             <Icon as={Clock} size={14} />
-            <Text>Added on {new Date(client.created_at).toLocaleDateString()}</Text>
+            <Text>Added on {new Date(clientData.created_at).toLocaleDateString()}</Text>
           </HStack>
         </Box>
       </Flex>
@@ -62,7 +81,7 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
         <Card bg={bgCard} shadow="sm" borderWidth="1px" borderColor={borderColor}>
           <CardBody>
             <Flex align="center" gap={4} mb={4}>
-              <Avatar name={client.name} bg="teal.500" color="white" size="md" />
+              <Avatar name={clientData.name} bg="teal.500" color="white" size="md" />
               <Box>
                 <Heading size="sm">Contact Details</Heading>
                 <Text fontSize="xs" color="gray.500">PRIMARY CONTACT</Text>
@@ -72,21 +91,26 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
             <VStack align="start" spacing={3}>
               <HStack>
                 <Icon as={Mail} size={16} color="gray.400" />
-                <Text fontSize="sm">{client.email || 'No email provided'}</Text>
+                <Text fontSize="sm">{clientData.email || 'No email provided'}</Text>
               </HStack>
               <HStack>
                 <Icon as={Phone} size={16} color="gray.400" />
-                <Text fontSize="sm">{client.phone || 'No phone provided'}</Text>
+                <Text fontSize="sm">{clientData.phone || 'No phone provided'}</Text>
               </HStack>
               <HStack align="start">
                 <Icon as={MapPin} size={16} color="gray.400" mt={1} />
-                <Text fontSize="sm">{client.address || 'No address provided'}</Text>
+                <Text fontSize="sm">{clientData.address || 'No address provided'}</Text>
               </HStack>
             </VStack>
             <Box mt={6}>
                  <Flex justify="flex-end">
-                     {/* Placeholder Edit Button */}
-                     <Button size="sm" variant="outline" leftIcon={<Icon as={FileText} />}>
+                     {/* 🟢 4. The Real Edit Button */}
+                     <Button 
+                        size="sm" 
+                        variant="outline" 
+                        leftIcon={<Icon as={Edit} size={16} />}
+                        onClick={onOpen}
+                     >
                         Edit Client
                      </Button>
                  </Flex>
@@ -99,16 +123,14 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
            <SimpleGrid columns={{ base: 1, md: 3 }} gap={4} mb={6}>
               <StatCard 
                 label="Lifetime Value" 
-                // 🟢 UPDATED: Uses client's preferred currency
-                value={formatCurrency(stats.lifetimeValue, client.currency)} 
+                value={formatCurrency(stats.lifetimeValue, clientData.currency)} 
                 icon={CheckCircle2} 
                 color="green.500" 
                 helpText="Total Paid Invoices"
               />
               <StatCard 
                 label="Outstanding" 
-                // 🟢 UPDATED: Uses client's preferred currency
-                value={formatCurrency(stats.outstanding, client.currency)} 
+                value={formatCurrency(stats.outstanding, clientData.currency)} 
                 icon={AlertCircle} 
                 color="orange.500" 
                 helpText="Unpaid Sent Invoices"
@@ -138,12 +160,18 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
                    <Th>Type</Th>
                    <Th>Status</Th>
                    <Th isNumeric>Amount</Th>
+                   <Th>Actions</Th>
                  </Tr>
                </Thead>
                <Tbody>
                  {documents.length > 0 ? (
                    documents.map((doc: any) => (
-                     <Tr key={doc.id} _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }} cursor="pointer" onClick={() => router.push(`/quote/${doc.id}`)}>
+                     <Tr 
+                        key={doc.id} 
+                        _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }} 
+                        cursor="pointer" 
+                        onClick={() => router.push(`/quote/${doc.id}`)}
+                     >
                        <Td>{new Date(doc.created_at).toLocaleDateString()}</Td>
                        <Td fontWeight="medium">#{doc.invoice_number}</Td>
                        <Td>{doc.document_type}</Td>
@@ -158,13 +186,24 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
                            {doc.status}
                          </Badge>
                        </Td>
-                       {/* 🟢 UPDATED: Uses individual document currency */}
                        <Td isNumeric>{formatCurrency(doc.total, doc.currency)}</Td>
+                       
+                       {/* SHARE ACTION */}
+                       <Td onClick={(e) => e.stopPropagation()}>
+                          <ShareInvoice 
+                            quoteId={doc.id}
+                            invoiceNumber={doc.invoice_number}
+                            clientName={clientData.name}
+                            clientEmail={clientData.email}
+                            isIconOnly={true}
+                          />
+                       </Td>
+
                      </Tr>
                    ))
                  ) : (
                    <Tr>
-                     <Td colSpan={5} textAlign="center" py={8} color="gray.500">
+                     <Td colSpan={6} textAlign="center" py={8} color="gray.500">
                        No documents found for this client.
                      </Td>
                    </Tr>
@@ -173,13 +212,21 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
              </Table>
            </Box>
         </Box>
-
       </SimpleGrid>
+
+      {/* 🟢 5. The Modal Component */}
+      <EditClientModal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        client={clientData} 
+        onClientUpdated={handleClientUpdated}
+      />
+
     </Box>
   );
 }
 
-// Sub-component for Stats
+// Sub-component for Stats (Unchanged)
 const StatCard = ({ label, value, icon, color, helpText }: any) => {
     const bg = useColorModeValue('white', 'gray.800');
     return (

@@ -86,8 +86,8 @@ const Footer = () => {
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(49, 151, 149, 0); }
   `;
 
-  // LOCKED VERSION
-  const appVersion = "v2.5.0-RC1";
+  // 🟢 LOCKED VERSION: Mission Complete v3.0.0
+  const appVersion = "v3.0.0";
 
   // Animation Variants
   const containerVariants = {

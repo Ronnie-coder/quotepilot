@@ -3,6 +3,7 @@
 import { Box, Heading, Text, VStack, HStack, Button, Icon } from '@chakra-ui/react';
 import { InvoiceForm } from '@/components/InvoiceForm'; 
 import DocumentViewer from '@/components/DocumentViewer';
+import ShareInvoice from '@/components/ShareInvoice'; // <--- 1. NEW IMPORT
 import NextLink from 'next/link';
 import { FilePenLine, ArrowLeft } from 'lucide-react';
 import { Tables } from '@/types/supabase';
@@ -40,13 +41,22 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
             Back to Documents
           </Button>
           {isViewing && (
-            <Button as={NextLink} href={`/quote/${quote.id}`} bg={primaryColor} color={primaryTextColor} _hover={{ opacity: 0.9 }} leftIcon={<Icon as={FilePenLine} />}>
+            <Button as={NextLink} href={`/dashboard/quote/${quote.id}`} bg={primaryColor} color={primaryTextColor} _hover={{ opacity: 0.9 }} leftIcon={<Icon as={FilePenLine} />}>
               Edit Document
             </Button>
           )}
         </HStack>
       </HStack>
       
+      {/* 2. INSERT SHARE MODULE HERE */}
+      <ShareInvoice 
+        quoteId={quote.id} 
+        clientName={quote.clients?.name || "Client"} 
+        invoiceNumber={quote.invoice_number || ""}
+          clientEmail={quote.clients?.email || ""}
+      />
+      {/* ------------------------- */}
+
       {isViewing ? (
         // The DocumentViewer will now receive the currency inside the 'quote' object
         <DocumentViewer quote={quote as any} profile={profile} />

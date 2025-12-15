@@ -24,7 +24,7 @@ export default async function QuotesPage({
     .eq('id', user.id)
     .single();
 
-  const systemCurrency = profile?.currency || 'USD'; // Default to USD if profile is empty
+  const systemCurrency = profile?.currency || 'USD'; 
 
   const searchQuery = searchParams.q as string || '';
   const statusFilter = searchParams.status as string || '';
@@ -34,12 +34,13 @@ export default async function QuotesPage({
   const offset = (page - 1) * limit;
 
   // 2. FETCH DOCUMENTS
+  // 🟢 COMMANDER UPDATE: We added 'id' and 'email' to the clients fetch
   let query = supabase
     .from('quotes')
     .select(
       `
       id, created_at, document_type, invoice_number, status, total, currency,
-      clients ( name ) 
+      clients ( id, name, email ) 
     `,
       { count: 'exact' }
     )
@@ -72,12 +73,16 @@ export default async function QuotesPage({
 
   // 3. FORMATTING LOGIC
   const formattedDocuments =
-    (documents as any[])?.map((doc: any) => ({
-      ...doc,
-      // 🟢 COMMANDER FIX: Use the Doc's currency. If missing, use System Default. NEVER hardcode ZAR.
-      currency: doc.currency || systemCurrency,
-      clients: Array.isArray(doc.clients) ? doc.clients[0] : doc.clients || { name: 'Unknown Client' },
-    })) || [];
+    (documents as any[])?.map((doc: any) => {
+      // Handle the array vs object quirk from Supabase
+      const clientData = Array.isArray(doc.clients) ? doc.clients[0] : doc.clients;
+      
+      return {
+        ...doc,
+        currency: doc.currency || systemCurrency,
+        clients: clientData || { name: 'Unknown Client', email: '', id: '' },
+      };
+    }) || [];
 
   return (
     <QuotesClientPage

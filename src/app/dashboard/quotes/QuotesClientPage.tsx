@@ -6,7 +6,7 @@ import {
   HStack, IconButton, Tag, TagLabel, TagLeftIcon, useColorModeValue,
   Spinner, useToast, VStack, Text, Flex, Icon, InputGroup, InputLeftElement,
   Input, InputRightElement, Select, Menu, MenuButton, MenuList, MenuItem,
-  MenuDivider, MenuGroup, chakra,
+  MenuDivider, MenuGroup, chakra, Link as ChakraLink
 } from '@chakra-ui/react';
 import { 
   Plus, Eye, Download, MoreHorizontal, Search, X, CheckCircle2, AlertCircle, Send, FileText
@@ -18,6 +18,8 @@ import { updateDocumentStatusAction, getQuoteForPdf } from './actions';
 import { generatePdf } from '@/utils/pdfGenerator';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { motion, isValidMotionProp } from 'framer-motion';
+// 🟢 IMPORT THE SHARE COMPONENT
+import ShareInvoice from '@/components/ShareInvoice'; 
 
 // --- TYPE DEFINITIONS ---
 type DocumentStatus = 'draft' | 'sent' | 'paid' | 'overdue';
@@ -31,10 +33,14 @@ interface Document {
   status: DocumentStatus | string;
   total: number;
   currency?: string; 
-  clients: { name: string };
+  // 🟢 UPDATED INTERFACE
+  clients: { 
+    id?: string;
+    name: string; 
+    email?: string; 
+  };
 }
 
-// 🟢 COMMANDER FIX: Interface now expects 'documents', not 'initialDocuments'
 interface QuotesClientPageProps {
   documents: Document[]; 
   count: number;
@@ -60,12 +66,9 @@ function debounce(func: (...args: any[]) => void, delay: number) {
 }
 
 // --- MAIN COMPONENT ---
-// 🟢 COMMANDER FIX: We alias 'documents' to 'serverDocuments' and default it to [] 
 export default function QuotesClientPage({ documents: serverDocuments = [], count, page, limit }: QuotesClientPageProps) {
   
-  // Initialize state with the incoming server data
   const [documents, setDocuments] = useState<Document[]>(serverDocuments);
-  
   const [loadingPdfId, setLoadingPdfId] = useState<string | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,6 +78,7 @@ export default function QuotesClientPage({ documents: serverDocuments = [], coun
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Theme Colors
   const brandColor = 'brand.500';
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -82,7 +86,6 @@ export default function QuotesClientPage({ documents: serverDocuments = [], coun
   const mutedText = useColorModeValue('gray.500', 'gray.400');
   const rowHoverBg = useColorModeValue('gray.50', 'gray.700');
 
-  // 🟢 COMMANDER FIX: Sync state if server data changes
   useEffect(() => { setDocuments(serverDocuments); }, [serverDocuments]);
   
   useEffect(() => {
@@ -175,6 +178,7 @@ export default function QuotesClientPage({ documents: serverDocuments = [], coun
 
   const isActionDisabled = (id: string) => loadingPdfId === id || updatingStatusId === id;
   const totalPages = Math.ceil(count / limit);
+  
     return (
     <MotionBox variants={containerVariants} initial="hidden" animate="visible">
       {/* 1. HEADER */}
@@ -279,29 +283,52 @@ const DocumentRow = ({ doc, isDisabled, isLoadingPdf, isUpdatingStatus, handleSt
         </Tag>
       </Td>
       <Td fontWeight="medium" fontSize="sm">{doc.invoice_number}<Tag ml={2} size="sm" variant="outline" colorScheme="gray" fontSize="xs">{doc.document_type === 'Invoice' ? 'INV' : 'QT'}</Tag></Td>
-      <Td fontSize="sm" color="gray.600">{doc.clients.name}</Td>
+      
+      {/* 🟢 CLICKABLE CLIENT NAME */}
+      <Td fontSize="sm">
+        {doc.clients.id ? (
+          <ChakraLink as={NextLink} href={`/dashboard/clients/${doc.clients.id}`} color="blue.500" fontWeight="medium" _hover={{ textDecoration: 'underline' }}>
+             {doc.clients.name}
+          </ChakraLink>
+        ) : (
+          <Text color="gray.600">{doc.clients.name}</Text>
+        )}
+      </Td>
+
       <Td fontSize="sm" color="gray.500">{formattedDate}</Td>
       <Td isNumeric fontWeight="bold" fontFamily="mono" color="gray.700">
         {formatCurrency(doc.total, doc.currency)}
       </Td>
+
+      {/* 🟢 ACTIONS COLUMN WITH SHARE BUTTON */}
       <Td isNumeric>
-        <Menu autoSelect={false} placement="bottom-end">
-          <MenuButton as={IconButton} aria-label="Actions" icon={<Icon as={MoreHorizontal} />} variant="ghost" size="sm" isDisabled={isDisabled} />
-          <MenuList fontSize="sm" shadow="lg" borderColor="gray.200">
-            <MenuItem as={NextLink} href={`/quote/${doc.id}`} icon={<Icon as={Eye} boxSize={4} />}>View / Edit</MenuItem>
-            <MenuItem onClick={() => handleDownload(doc.id, doc.invoice_number)} icon={isLoadingPdf ? <Spinner size="xs" /> : <Icon as={Download} boxSize={4} />} isDisabled={isLoadingPdf}>
-              {isLoadingPdf ? 'Generating...' : 'Download PDF'}
-            </MenuItem>
-            <MenuDivider />
-            <MenuGroup title="Update Status">
-              {statusLower !== 'sent' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'sent')} icon={<Icon as={Send} boxSize={4} color="blue.500" />}>Mark as Sent</MenuItem>)}
-              {statusLower !== 'paid' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'paid')} icon={<Icon as={CheckCircle2} boxSize={4} color="green.500" />}>Mark as Paid</MenuItem>)}
-              {statusLower !== 'draft' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'draft')} icon={<Icon as={FileText} boxSize={4} color="gray.500" />}>Mark as Draft</MenuItem>)}
-            </MenuGroup>
-            <MenuDivider />
-            <DeleteButton quoteId={doc.id} clientName={doc.clients.name} isDisabled={isDisabled} />
-          </MenuList>
-        </Menu>
+        <HStack justify="flex-end" spacing={1}>
+            <ShareInvoice 
+                quoteId={doc.id}
+                invoiceNumber={doc.invoice_number}
+                clientName={doc.clients.name}
+                clientEmail={doc.clients.email} // Now available from the updated server query
+                isIconOnly={true}
+            />
+
+            <Menu autoSelect={false} placement="bottom-end">
+            <MenuButton as={IconButton} aria-label="Actions" icon={<Icon as={MoreHorizontal} />} variant="ghost" size="sm" isDisabled={isDisabled} />
+            <MenuList fontSize="sm" shadow="lg" borderColor="gray.200">
+                <MenuItem as={NextLink} href={`/quote/${doc.id}`} icon={<Icon as={Eye} boxSize={4} />}>View / Edit</MenuItem>
+                <MenuItem onClick={() => handleDownload(doc.id, doc.invoice_number)} icon={isLoadingPdf ? <Spinner size="xs" /> : <Icon as={Download} boxSize={4} />} isDisabled={isLoadingPdf}>
+                {isLoadingPdf ? 'Generating...' : 'Download PDF'}
+                </MenuItem>
+                <MenuDivider />
+                <MenuGroup title="Update Status">
+                {statusLower !== 'sent' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'sent')} icon={<Icon as={Send} boxSize={4} color="blue.500" />}>Mark as Sent</MenuItem>)}
+                {statusLower !== 'paid' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'paid')} icon={<Icon as={CheckCircle2} boxSize={4} color="green.500" />}>Mark as Paid</MenuItem>)}
+                {statusLower !== 'draft' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'draft')} icon={<Icon as={FileText} boxSize={4} color="gray.500" />}>Mark as Draft</MenuItem>)}
+                </MenuGroup>
+                <MenuDivider />
+                <DeleteButton quoteId={doc.id} clientName={doc.clients.name} isDisabled={isDisabled} />
+            </MenuList>
+            </Menu>
+        </HStack>
       </Td>
     </MotionTr>
   );

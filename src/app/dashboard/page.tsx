@@ -10,7 +10,7 @@ export default async function DashboardPage() {
     redirect('/sign-in');
   }
 
-  // 1. Fetch Profile
+  // 1. Fetch Profile for Currency
   const { data: profile } = await supabase.from('profiles').select('currency').eq('id', user.id).single();
   const systemCurrency = profile?.currency || 'USD';
 
@@ -26,7 +26,6 @@ export default async function DashboardPage() {
     .order('created_at', { ascending: false })
     .limit(5);
 
-  // Helper to extract client name safely regardless of array vs object
   const getClientName = (clientData: any) => {
     if (!clientData) return 'Unknown';
     if (Array.isArray(clientData)) {
@@ -35,7 +34,6 @@ export default async function DashboardPage() {
     return clientData?.name || 'Unknown';
   };
 
-  // TRANSFORM 1: Normalize clients for Recent Activity
   const recentDocuments = rawRecentDocuments?.map((doc) => ({
     ...doc,
     clients: { name: getClientName(doc.clients) }
@@ -51,13 +49,12 @@ export default async function DashboardPage() {
     .neq('status', 'draft') 
     .limit(10);
 
-  // TRANSFORM 2: Normalize clients for Overdue Invoices
   const overdueInvoices = rawOverdueInvoices?.map((inv) => ({
     ...inv,
     clients: { name: getClientName(inv.clients) }
   })) || [];
 
-  // 5. Total Revenue
+  // 5. FINANCIALS: Total Revenue (PAID)
   const { data: paidInvoices } = await supabase
     .from('quotes')
     .select('total, created_at')
@@ -66,7 +63,18 @@ export default async function DashboardPage() {
 
   const totalRevenue = paidInvoices?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
 
-  // 6. Chart Data (Revenue Velocity)
+  // 🟢 6. FINANCIALS: Outstanding Revenue (SENT + OVERDUE)
+  // Logic: Anything that is NOT 'draft' and NOT 'paid' is money we are waiting for.
+  const { data: outstandingDocs } = await supabase
+    .from('quotes')
+    .select('total')
+    .eq('user_id', user.id)
+    .neq('status', 'draft')
+    .neq('status', 'paid');
+
+  const outstandingRevenue = outstandingDocs?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
+
+  // 7. Chart Data (Revenue Velocity)
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const revenueData = new Array(6).fill(0).map((_, i) => {
     const d = new Date();
@@ -80,7 +88,7 @@ export default async function DashboardPage() {
     if (point) point.value += inv.total;
   });
 
-  // 7. Invoice Health Logic
+  // 8. Invoice Health Logic
   const { data: allDocs } = await supabase
     .from('quotes')
     .select('status, due_date')
@@ -91,16 +99,10 @@ export default async function DashboardPage() {
 
   allDocs?.forEach((doc) => {
     let s = doc.status ? doc.status.toLowerCase() : 'draft';
-
-    // LOGIC CHECK: If it's NOT paid, NOT draft, and the Date is passed... it is OVERDUE.
     if (s !== 'paid' && s !== 'draft' && doc.due_date && new Date(doc.due_date) < now) {
       s = 'overdue';
     }
-
-    // Capitalize for the chart key
     const key = s.charAt(0).toUpperCase() + s.slice(1);
-    
-    // Add to tally if key exists, otherwise ignore
     if (key in statusCounts) {
         statusCounts[key as keyof typeof statusCounts]++;
     }
@@ -114,6 +116,7 @@ export default async function DashboardPage() {
       clientCount={clientCount || 0}
       quoteCount={quoteCount || 0}
       totalRevenue={totalRevenue}
+      outstandingRevenue={outstandingRevenue} // 🟢 Passing the new data
       recentDocuments={recentDocuments}
       overdueInvoices={overdueInvoices}
       revenueData={revenueData}
