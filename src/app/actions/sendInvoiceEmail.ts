@@ -12,7 +12,6 @@ export async function sendInvoiceEmail(quoteId: string) {
   const supabase = createSupabaseAdminClient();
 
   // 1. Fetch Quote Data
-  // FIX: Removed 'email' from profiles request to stop the DB Error
   const { data: quote, error: dbError } = await supabase
     .from("quotes")
     .select(`
@@ -37,7 +36,6 @@ export async function sendInvoiceEmail(quoteId: string) {
   }
 
   // 3. Fetch the Freelancer's Real Email (The Sender)
-  // Since 'email' isn't in the profiles table, we fetch it from the Auth system using the user_id on the quote
   const { data: userData, error: userError } = await supabase.auth.admin.getUserById(quote.user_id);
   
   // Fallback: If we can't find the user, replies go to support
@@ -69,8 +67,8 @@ export async function sendInvoiceEmail(quoteId: string) {
       to: [client.email], 
       
       // ↩️ REPLY-TO: The Freelancer (User)
-      // When the client hits reply, it goes to the User, not Coderon
-      reply_to: freelancerEmail,
+      // ✅ FIXED: Changed 'reply_to' to 'replyTo' (camelCase)
+      replyTo: freelancerEmail,
 
       subject: `Invoice #${quote.invoice_number} from ${senderDisplayName}`,
       html: emailHtml,
