@@ -1,12 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { PaymentSettings, PaymentProvider, PaymentProviderType } from '@/types/profile';
-import { UserProfile } from '@/types/profile';
+import { createClient } from '@/lib/supabase/client'; // Now this will work
+import { PaymentSettings, PaymentProviderType } from '@/types/profile';
 
-// Icons (using standard SVGs to avoid dependency issues if you don't have lucide-react installed)
-const SaveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>;
+// Standard SVG Icon
+const SaveIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+    <polyline points="7 3 7 8 15 8"></polyline>
+  </svg>
+);
 
 interface Props {
   initialSettings: PaymentSettings | null;
@@ -50,13 +55,10 @@ export default function PaymentLinksSettings({ initialSettings, userId }: Props)
     setMessage('');
 
     try {
-      // 1. Fetch current profile to ensure we don't overwrite other fields
-      // (Optional if your update logic is robust, but safer this way)
-      
       const { error } = await supabase
         .from('profiles')
         .update({ 
-          payment_settings: settings as any, // Cast to any to bypass strict JSON type checks if needed
+          payment_settings: settings as any, 
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);
