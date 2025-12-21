@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client'; // Now this will work
+// 🟢 FIX: Import the correct function name that exists in your project
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'; 
 import { PaymentSettings, PaymentProviderType } from '@/types/profile';
 
 // Standard SVG Icon
@@ -19,7 +20,8 @@ interface Props {
 }
 
 export default function PaymentLinksSettings({ initialSettings, userId }: Props) {
-  const supabase = createClient();
+  // 🟢 FIX: Call the correct function
+  const supabase = createSupabaseBrowserClient();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
