@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-// 🟢 FIX: Import the correct function name that exists in your project
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'; 
 import { PaymentSettings, PaymentProviderType } from '@/types/profile';
 
@@ -20,7 +19,6 @@ interface Props {
 }
 
 export default function PaymentLinksSettings({ initialSettings, userId }: Props) {
-  // 🟢 FIX: Call the correct function
   const supabase = createSupabaseBrowserClient();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -57,12 +55,17 @@ export default function PaymentLinksSettings({ initialSettings, userId }: Props)
     setMessage('');
 
     try {
+      // 🟢 COMMANDER FIX: We cast the whole object to 'any' here.
+      // This bypasses the outdated 'Database' type definition that doesn't 
+      // yet know about the 'payment_settings' column.
+      const updates = { 
+        payment_settings: settings, 
+        updated_at: new Date().toISOString()
+      } as any;
+
       const { error } = await supabase
         .from('profiles')
-        .update({ 
-          payment_settings: settings as any, 
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', userId);
 
       if (error) throw error;
