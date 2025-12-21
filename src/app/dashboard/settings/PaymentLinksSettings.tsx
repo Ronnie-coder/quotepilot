@@ -55,16 +55,14 @@ export default function PaymentLinksSettings({ initialSettings, userId }: Props)
     setMessage('');
 
     try {
-      // 🟢 COMMANDER FIX: We cast the whole object to 'any' here.
-      // This bypasses the outdated 'Database' type definition that doesn't 
-      // yet know about the 'payment_settings' column.
       const updates = { 
         payment_settings: settings, 
         updated_at: new Date().toISOString()
-      } as any;
+      };
 
       const { error } = await supabase
         .from('profiles')
+        // @ts-ignore
         .update(updates)
         .eq('id', userId);
 
