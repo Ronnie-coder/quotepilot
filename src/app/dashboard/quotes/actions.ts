@@ -5,6 +5,7 @@ import { InvoiceFormData } from '@/types/invoice';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { generatePdf } from '@/utils/pdfGenerator';
+import { PaymentSettings } from '@/types/profile';
 
 type QuotePayload = {
   formData: InvoiceFormData;
@@ -19,6 +20,7 @@ type UpdateQuotePayload = {
   total: number;
 };
 
+// --- 1. CREATE ACTION ---
 export const createQuoteAction = async ({ formData, documentType, total }: QuotePayload) => {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -56,8 +58,8 @@ export const createQuoteAction = async ({ formData, documentType, total }: Quote
         due_date: (documentType === 'Invoice' && formData.dueDate) ? formData.dueDate : null, 
         vat_rate: formData.applyVat ? formData.vatRate : 0,
         brand_color: formData.brandColor || '#319795',
-        // 🟢 COMMANDER FIX: Save the currency!
-        currency: formData.currency || 'USD' 
+        currency: formData.currency || 'USD',
+        payment_link: formData.paymentLink || null 
       };
 
       const { error: quoteError } = await supabase.from('quotes').insert(documentPayload);
@@ -73,6 +75,7 @@ export const createQuoteAction = async ({ formData, documentType, total }: Quote
     redirect('/dashboard/quotes');
 };
 
+// --- 2. UPDATE ACTION ---
 export const updateQuoteAction = async ({ quoteId, formData, documentType, total }: UpdateQuotePayload) => {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -95,8 +98,8 @@ export const updateQuoteAction = async ({ quoteId, formData, documentType, total
         due_date: (documentType === 'Invoice' && formData.dueDate) ? formData.dueDate : null,
         vat_rate: formData.applyVat ? formData.vatRate : 0,
         brand_color: formData.brandColor || '#319795',
-        // 🟢 COMMANDER FIX: Update the currency!
-        currency: formData.currency || 'USD'
+        currency: formData.currency || 'USD',
+        payment_link: formData.paymentLink || null
       };
   
       const { error: updateError } = await supabase
@@ -118,6 +121,7 @@ export const updateQuoteAction = async ({ quoteId, formData, documentType, total
     redirect('/dashboard/quotes');
 };
 
+// --- 3. DELETE ACTION ---
 export const deleteQuoteAction = async (quoteId: string) => {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -134,6 +138,7 @@ export const deleteQuoteAction = async (quoteId: string) => {
     return { success: 'Document purged successfully.' };
 };
 
+// --- 4. GENERATE PDF ACTION (FOR EMAIL/DOWNLOAD AFTER SAVE) ---
 export const generatePdfAction = async (quoteId: string) => {
     try {
         const supabase = await createSupabaseServerClient();
@@ -148,6 +153,20 @@ export const generatePdfAction = async (quoteId: string) => {
         if (quoteError || profileError || !quote || !profile) {
           return { success: false, error: 'Failed to fetch complete document data for PDF generation.' };
         }
+        
+        // --- RESOLVE PAYMENT LINK ---
+        let activePaymentLink = quote.payment_link;
+
+        if (!activePaymentLink && profile.payment_settings) {
+          const settings = profile.payment_settings as unknown as PaymentSettings;
+          if (settings.default_provider) {
+            const provider = settings.providers.find((p) => p.id === settings.default_provider);
+            if (provider && provider.url) {
+              activePaymentLink = provider.url;
+            }
+          }
+        }
+        // -----------------------------
     
         const client = quote.clients as any;
         const subtotal = (quote.line_items as any[])?.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0) || 0;
@@ -158,9 +177,13 @@ export const generatePdfAction = async (quoteId: string) => {
           invoiceNumber: quote.invoice_number,
           invoiceDate: quote.invoice_date,
           dueDate: quote.due_date,
+          // 🟢 MAP LOGO & SIGNATURE CORRECTLY
           logo: profile.logo_url,
+          signature: profile.signature_url, 
           brandColor: quote.brand_color || '#319795', 
-          currency: quote.currency || 'USD', // 🟢 COMMANDER FIX: Pass currency to PDF
+          currency: quote.currency || 'USD', 
+          paymentLink: activePaymentLink, 
+          
           from: { name: profile.company_name, address: profile.company_address, email: user.email },
           to: { name: client.name, address: client.address, email: client.email },
           lineItems: quote.line_items as any,
@@ -173,12 +196,7 @@ export const generatePdfAction = async (quoteId: string) => {
           subtotal: subtotal, vatAmount: vatAmount, total: quote.total,
         };
     
-        // 🟢 COMMANDER FIX: Handle Blob conversion manually
-        // Since generatePdf returns a Blob, we must convert it to Base64 
-        // to send it back to the client side safely.
         const pdfBlob = await generatePdf(pdfData as any);
-        
-        // Convert Blob -> ArrayBuffer -> Buffer -> Base64
         const arrayBuffer = await pdfBlob.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const pdfBase64 = buffer.toString('base64');
@@ -192,6 +210,7 @@ export const generatePdfAction = async (quoteId: string) => {
       }
 };
 
+// --- 5. UPDATE STATUS ACTION ---
 export async function updateDocumentStatusAction(documentId: string, newStatus: string) {
   const supabase = createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -199,15 +218,20 @@ export async function updateDocumentStatusAction(documentId: string, newStatus: 
   if (!user) return { success: false, error: 'Authentication required.' };
 
   const validStatuses = ['draft', 'sent', 'paid', 'overdue'];
-  if (!validStatuses.includes(newStatus)) return { success: false, error: 'Invalid status.' };
+  if (!validStatuses.includes(newStatus.toLowerCase())) {
+     return { success: false, error: 'Invalid status.' };
+  }
 
-  const { error } = await supabase.from('quotes').update({ status: newStatus }).eq('id', documentId).eq('user_id', user.id);
+  const formattedStatus = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase();
+
+  const { error } = await supabase.from('quotes').update({ status: formattedStatus }).eq('id', documentId).eq('user_id', user.id);
 
   if (error) return { success: false, error: 'Failed to update status.' };
   revalidatePath('/dashboard/quotes');
   return { success: true };
 }
 
+// --- 6. GET QUOTE HELPER ---
 export async function getQuoteForPdf(quoteId: string) {
   const supabase = createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();

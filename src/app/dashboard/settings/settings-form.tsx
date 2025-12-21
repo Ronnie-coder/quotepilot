@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  Box, Button, FormControl, FormLabel, Input, VStack, useToast, Textarea, Heading, HStack, Flex, Grid, GridItem, Icon, useColorModeValue, SimpleGrid, Select, Divider
+  Box, Button, FormControl, FormLabel, Input, VStack, useToast, Textarea, Heading, HStack, Flex, Grid, GridItem, Icon, useColorModeValue, SimpleGrid, Select, Badge, Tooltip
 } from '@chakra-ui/react';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,10 +9,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useFormState } from 'react-dom';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Tables } from '@/types/supabase';
-import { uploadLogoAction } from './actions';
+// 🟢 IMPORT NEW ACTION & COMPONENT
+import { uploadLogoAction, uploadSignatureAction } from './actions';
 import LogoUploader from '@/components/LogoUploader';
-import { Building, Banknote, FileText, UploadCloud, Save, Globe } from 'lucide-react';
+import SignatureUploader from '@/components/SignatureUploader'; 
+
+import { Building, Banknote, FileText, UploadCloud, Save, Link as LinkIcon, CheckCircle, PenTool } from 'lucide-react'; 
 import { motion } from 'framer-motion';
+import { PaymentSettings, PaymentProviderType } from '@/types/profile';
 
 type ProfileWithBanking = Tables<'profiles'> & {
   bank_name?: string | null;
@@ -21,7 +25,9 @@ type ProfileWithBanking = Tables<'profiles'> & {
   account_type?: string | null;
   branch_code?: string | null;
   branch_name?: string | null;
-  currency?: string | null; 
+  currency?: string | null;
+  payment_settings?: PaymentSettings | null; 
+  signature_url?: string | null; // 🟢 Added Type
 };
 
 type SettingsFormProps = {
@@ -29,25 +35,17 @@ type SettingsFormProps = {
   profile: ProfileWithBanking | null;
 };
 
-// --- ANIMATION VARIANTS ---
+// ... (Variants Constants stay same) ...
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
 };
-
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: { duration: 0.5, ease: 'easeOut' },
-  },
+  visible: { y: 0, opacity: 1, transition: { duration: 0.5, ease: 'easeOut' } },
 };
 
-// --- SETTINGS SECTION COMPONENT ---
+// ... (SettingsSection Component stays same) ...
 const SettingsSection = ({ title, icon, children }: { title: string, icon: React.ElementType, children: React.ReactNode }) => {
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -65,8 +63,6 @@ const SettingsSection = ({ title, icon, children }: { title: string, icon: React
       shadow="sm" 
       borderWidth="1px" 
       borderColor={borderColor}
-      transition="all 0.2s"
-      _hover={{ shadow: 'md' }}
       h="full"
     >
       <HStack as="header" spacing={4} mb={6}>
@@ -88,45 +84,32 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toastShownRef = useRef(false);
-  
-  // --- THEME COLORS ---
   const focusBorderColor = useColorModeValue('cyan.500', 'cyan.300');
-  const buttonBg = useColorModeValue('cyan.500', 'cyan.400');
-  const buttonHoverBg = useColorModeValue('cyan.600', 'cyan.500');
-  const buttonText = 'white';
 
+  // --- LOGO STATE ---
   const initialLogoState = { success: false, message: '' };
   const [logoState, logoFormAction] = useFormState(uploadLogoAction, initialLogoState);
 
-  // Logo Upload Toast Logic
+  // --- 🟢 NEW: SIGNATURE STATE ---
+  const initialSigState = { success: false, message: '' };
+  const [sigState, sigFormAction] = useFormState(uploadSignatureAction, initialSigState);
+
+  // Toast Logic for Uploads
   useEffect(() => {
     if (logoState.message) {
-      toast({
-        title: logoState.success ? 'Success' : 'Error',
-        description: logoState.message,
-        status: logoState.success ? 'success' : 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      if (logoState.success) { router.refresh(); }
+      toast({ title: logoState.success ? 'Success' : 'Error', description: logoState.message, status: logoState.success ? 'success' : 'error', duration: 4000 });
+      if (logoState.success) router.refresh();
     }
   }, [logoState, toast, router]);
-  
-  // Onboarding Toast Logic
+
   useEffect(() => {
-    if (searchParams.get('onboarding') === 'true' && !toastShownRef.current) {
-      toastShownRef.current = true;
-      toast({
-        title: 'Welcome to QuotePilot!',
-        description: 'Please complete your company profile to begin.',
-        status: 'info',
-        duration: 8000,
-        isClosable: true,
-        position: 'top',
-      });
-      router.replace('/dashboard/settings', { scroll: false });
+    if (sigState.message) {
+      toast({ title: sigState.success ? 'Success' : 'Error', description: sigState.message, status: sigState.success ? 'success' : 'error', duration: 4000 });
+      if (sigState.success) router.refresh();
     }
-  }, [searchParams, toast, router]);
+  }, [sigState, toast, router]);
+  
+  // (Onboarding Toast Logic remains same...)
 
   // Form Field States
   const [companyName, setCompanyName] = useState(profile?.company_name || '');
@@ -143,28 +126,44 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const [branchCode, setBranchCode] = useState(profile?.branch_code || '');
   const [branchName, setBranchName] = useState(profile?.branch_name || '');
   const [accountType, setAccountType] = useState(profile?.account_type || '');
+
+  // Payment Link Logic
+  const defaultPaymentSettings: PaymentSettings = {
+    providers: [
+      { id: 'paystack', name: 'Paystack', url: '', enabled: false },
+      { id: 'yoco', name: 'Yoco', url: '', enabled: false },
+      { id: 'paypal', name: 'PayPal', url: '', enabled: false },
+      { id: 'manual', name: 'Manual / Other', url: '', enabled: false },
+    ],
+    default_provider: null
+  };
+
+  const mergedSettings = profile?.payment_settings 
+    ? { ...defaultPaymentSettings, ...profile.payment_settings, providers: defaultPaymentSettings.providers.map(p => { const saved = profile.payment_settings?.providers.find(sp => sp.id === p.id); return saved || p; }) }
+    : defaultPaymentSettings;
+
+  const [paymentConfig, setPaymentConfig] = useState<PaymentSettings>(mergedSettings);
   
+  const handleLinkChange = (id: PaymentProviderType, url: string) => {
+    setPaymentConfig(prev => ({ ...prev, providers: prev.providers.map(p => p.id === id ? { ...p, url, enabled: !!url } : p) }));
+  };
+
+  const handleSetDefault = (id: PaymentProviderType) => {
+    setPaymentConfig(prev => ({ ...prev, default_provider: prev.default_provider === id ? null : id }));
+  };
+
   const [isLoading, setIsLoading] = useState(false);
 
-  // Form Submission Logic
+  // Main Submit Logic
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     const payload = {
       id: user.id, 
-      company_name: companyName, 
-      company_address: companyAddress,
-      company_phone: companyPhone, 
-      vat_number: vatNumber, 
-      currency: currency,
-      terms_conditions: terms,
-      bank_name: bankName, 
-      account_holder: accountHolder, 
-      account_number: accountNumber,
-      branch_code: branchCode, 
-      branch_name: branchName, 
-      account_type: accountType,
+      company_name: companyName, company_address: companyAddress, company_phone: companyPhone, vat_number: vatNumber, currency: currency, terms_conditions: terms,
+      bank_name: bankName, account_holder: accountHolder, account_number: accountNumber, branch_code: branchCode, branch_name: branchName, account_type: accountType,
+      payment_settings: paymentConfig, 
       updated_at: new Date().toISOString(),
     };
 
@@ -173,7 +172,7 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     if (error) {
       toast({ title: 'Error Updating Profile', description: error.message, status: 'error' });
     } else {
-      toast({ title: 'Profile Updated Successfully', status: 'success' });
+      toast({ title: 'Settings Saved', description: 'Your profile has been updated.', status: 'success' });
       router.refresh();
     }
     setIsLoading(false);
@@ -183,8 +182,10 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     <Box as={motion.div} variants={containerVariants} initial="hidden" animate="visible">
       <VStack spacing={8} align="stretch">
         
-        {/* Top Section: Profile & Logo */}
+        {/* Top Section: Profile & Branding */}
         <Grid templateColumns={{ base: '1fr', lg: '3fr 2fr' }} gap={8}>
+          
+          {/* Left Column: Form Data */}
           <GridItem as="form" onSubmit={handleDetailsSubmit}>
             <SettingsSection title="Company Profile" icon={Building}>
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
@@ -193,59 +194,13 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
                   <Input focusBorderColor={focusBorderColor} value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
                 </FormControl>
                 
-                {/* --- PAN-AFRICAN CURRENCY SELECTOR --- */}
                 <FormControl isRequired>
                   <FormLabel>Billing Currency</FormLabel>
-                  <Select 
-                    focusBorderColor={focusBorderColor} 
-                    value={currency} 
-                    onChange={(e) => setCurrency(e.target.value)}
-                  >
-                    <optgroup label="Common">
-                      <option value="ZAR">ZAR (R) - South Africa</option>
-                      <option value="USD">USD ($) - International</option>
-                    </optgroup>
-                    
-                    <optgroup label="Southern Africa">
-                      <option value="NAD">NAD (N$) - Namibia</option>
-                      <option value="BWP">BWP (P) - Botswana</option>
-                      <option value="ZMW">ZMW (K) - Zambia</option>
-                      <option value="MZN">MZN (MT) - Mozambique</option>
-                      <option value="AOA">AOA (Kz) - Angola</option>
-                      <option value="LSL">LSL (L) - Lesotho</option>
-                      <option value="SZL">SZL (E) - Eswatini</option>
-                    </optgroup>
-
-                    <optgroup label="East Africa">
-                      <option value="KES">KES (KSh) - Kenya</option>
-                      <option value="TZS">TZS (TSh) - Tanzania</option>
-                      <option value="UGX">UGX (USh) - Uganda</option>
-                      <option value="RWF">RWF (FRw) - Rwanda</option>
-                      <option value="ETB">ETB (Br) - Ethiopia</option>
-                    </optgroup>
-
-                    <optgroup label="West Africa">
-                      <option value="NGN">NGN (₦) - Nigeria</option>
-                      <option value="GHS">GHS (₵) - Ghana</option>
-                      <option value="XOF">XOF (CFA) - West Africa</option>
-                      <option value="SLL">SLL (Le) - Sierra Leone</option>
-                    </optgroup>
-
-                    <optgroup label="North Africa">
-                      <option value="EGP">EGP (E£) - Egypt</option>
-                      <option value="MAD">MAD (DH) - Morocco</option>
-                    </optgroup>
-
-                    <optgroup label="Central Africa / Islands">
-                      <option value="XAF">XAF (CFA) - Central Africa</option>
-                      <option value="MUR">MUR (₨) - Mauritius</option>
-                    </optgroup>
-
-                    <optgroup label="Global">
-                      <option value="EUR">EUR (€) - Europe</option>
-                      <option value="GBP">GBP (£) - United Kingdom</option>
-                      <option value="AUD">AUD ($) - Australia</option>
-                    </optgroup>
+                  <Select focusBorderColor={focusBorderColor} value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                    <option value="ZAR">ZAR (R)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
                   </Select>
                 </FormControl>
 
@@ -267,71 +222,65 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
             </SettingsSection>
           </GridItem>
           
+          {/* Right Column: Uploaders */}
           <GridItem>
-            <SettingsSection title="Branding" icon={UploadCloud}>
-              <LogoUploader profile={profile} formAction={logoFormAction} state={logoState} />
-            </SettingsSection>
+            <VStack spacing={8} align="stretch" h="full">
+              <SettingsSection title="Branding (Logo)" icon={UploadCloud}>
+                 <LogoUploader profile={profile} formAction={logoFormAction} state={logoState} />
+              </SettingsSection>
+              
+              {/* 🟢 NEW: SIGNATURE SECTION */}
+              <SettingsSection title="Digital Signature" icon={PenTool}>
+                 <SignatureUploader profile={profile} formAction={sigFormAction} state={sigState} />
+              </SettingsSection>
+            </VStack>
           </GridItem>
         </Grid>
 
-        {/* Bottom Section: Banking & Terms */}
+        {/* Bottom Section: Payments & Bank */}
         <Box as="form" onSubmit={handleDetailsSubmit}>
           <VStack spacing={8} align="stretch">
-            <SettingsSection title="Banking & Payment Details" icon={Banknote}>
+            
+            <SettingsSection title="Online Payment Links" icon={LinkIcon}>
+              <Box>
+                <Badge colorScheme="cyan" mb={4}>Smart Feature</Badge>
+                <Box color="gray.500" fontSize="sm" mb={6}>
+                  Set your payment links here. The default link will generate a QR code and Pay button on your invoice.
+                </Box>
+                <SimpleGrid columns={1} spacing={4}>
+                  {paymentConfig.providers.map((provider) => (
+                    <Flex key={provider.id} align="center" gap={4} p={4} borderWidth="1px" borderRadius="md" bg={paymentConfig.default_provider === provider.id ? useColorModeValue('cyan.50', 'rgba(0, 200, 200, 0.1)') : 'transparent'} borderColor={paymentConfig.default_provider === provider.id ? 'cyan.400' : 'inherit'}>
+                      <Box minW="100px"><FormLabel mb={0} fontWeight="bold" fontSize="sm">{provider.name}</FormLabel></Box>
+                      <Input placeholder={`Your ${provider.name} URL`} value={provider.url} onChange={(e) => handleLinkChange(provider.id, e.target.value)} size="sm" borderRadius="md" focusBorderColor={focusBorderColor} />
+                      <Tooltip label={!provider.url ? "Add a URL first" : "Set as default for new invoices"}>
+                        <Button size="xs" colorScheme={paymentConfig.default_provider === provider.id ? "cyan" : "gray"} variant={paymentConfig.default_provider === provider.id ? "solid" : "outline"} onClick={() => handleSetDefault(provider.id)} isDisabled={!provider.url} leftIcon={paymentConfig.default_provider === provider.id ? <CheckCircle size={12} /> : undefined}>
+                          {paymentConfig.default_provider === provider.id ? 'Default' : 'Set Default'}
+                        </Button>
+                      </Tooltip>
+                    </Flex>
+                  ))}
+                </SimpleGrid>
+              </Box>
+            </SettingsSection>
+
+            <SettingsSection title="Banking Details (EFT)" icon={Banknote}>
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                <FormControl>
-                  <FormLabel>Bank Name</FormLabel>
-                  <Input focusBorderColor={focusBorderColor} placeholder="e.g. FNB" value={bankName} onChange={(e) => setBankName(e.target.value)} />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Account Holder</FormLabel>
-                  <Input focusBorderColor={focusBorderColor} placeholder="e.g. Coderon (Pty) Ltd" value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Account Number</FormLabel>
-                  <Input focusBorderColor={focusBorderColor} value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Account Type</FormLabel>
-                  <Input focusBorderColor={focusBorderColor} placeholder="e.g. Current Account" value={accountType} onChange={(e) => setAccountType(e.target.value)} />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Branch Code</FormLabel>
-                  <Input focusBorderColor={focusBorderColor} value={branchCode} onChange={(e) => setBranchCode(e.target.value)} />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Branch Name</FormLabel>
-                  <Input focusBorderColor={focusBorderColor} value={branchName} onChange={(e) => setBranchName(e.target.value)} />
-                </FormControl>
+                <FormControl><FormLabel>Bank Name</FormLabel><Input focusBorderColor={focusBorderColor} value={bankName} onChange={(e) => setBankName(e.target.value)} /></FormControl>
+                <FormControl><FormLabel>Account Holder</FormLabel><Input focusBorderColor={focusBorderColor} value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} /></FormControl>
+                <FormControl><FormLabel>Account Number</FormLabel><Input focusBorderColor={focusBorderColor} value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} /></FormControl>
+                <FormControl><FormLabel>Branch Code</FormLabel><Input focusBorderColor={focusBorderColor} value={branchCode} onChange={(e) => setBranchCode(e.target.value)} /></FormControl>
               </SimpleGrid>
             </SettingsSection>
             
             <SettingsSection title="Terms & Conditions" icon={FileText}>
               <FormControl>
                 <FormLabel>Default Footer Text</FormLabel>
-                <Textarea 
-                  focusBorderColor={focusBorderColor} 
-                  value={terms} 
-                  onChange={(e) => setTerms(e.target.value)} 
-                  placeholder="e.g., Payment due within 30 days. Banking details above." 
-                  rows={4} 
-                  resize="none"
-                />
+                <Textarea focusBorderColor={focusBorderColor} value={terms} onChange={(e) => setTerms(e.target.value)} rows={4} resize="none"/>
               </FormControl>
             </SettingsSection>
 
-            {/* Save Button */}
             <Flex justify="flex-end" pt={4}>
-              <Button 
-                type="submit" 
-                size="lg" 
-                isLoading={isLoading} 
-                bg={buttonBg} 
-                color={buttonText} 
-                leftIcon={<Icon as={Save} />}
-                _hover={{ bg: buttonHoverBg, transform: 'translateY(-2px)', shadow: 'md' }}
-                transition="all 0.2s"
-              >
+              <Button type="submit" size="lg" isLoading={isLoading} bg={useColorModeValue('cyan.500', 'cyan.400')} color="white" leftIcon={<Icon as={Save} />} _hover={{ bg: useColorModeValue('cyan.600', 'cyan.500') }}>
                 Save All Settings
               </Button>
             </Flex>

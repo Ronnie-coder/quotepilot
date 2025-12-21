@@ -1,49 +1,22 @@
 export interface InvoiceFormData {
-  logo: string | null;
-  documentType: 'Quote' | 'Invoice';
-  
-  // Your Business Info
-  from: {
-    name: string;
-    address: string;
-    email?: string;
-  };
-  
-  // Client Info
-  to: {
-    name: string;
-    address: string;
-    email?: string;
-  };
-  
-  // Document Specifics
   invoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
-  
-  // Line Items
+  to: {
+    name: string;
+    email?: string;
+    address?: string;
+  };
   lineItems: {
     description: string;
     quantity: number;
     unitPrice: number;
   }[];
-  
-  // Financials
+  notes?: string;
+  vatRate?: number;
   applyVat?: boolean;
-  vatRate: number;
-  
-  // Payment Info
-  payment: {
-    bankName: string;
-    accountHolder: string;
-    accNumber: string;
-    branchCode?: string;
-  };
-
-  // Optional Notes
-  notes: string;
-
-  // Branding & Localization
-  brandColor: string;
-  currency?: string; // <--- NEW: Supports USD, NGN, ZAR, etc.
+  brandColor?: string;
+  currency?: string; 
+  // 🟢 CRITICAL: This allows the link to be passed to the server
+  paymentLink?: string | null; 
 }

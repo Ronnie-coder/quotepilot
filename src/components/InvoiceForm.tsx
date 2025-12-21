@@ -28,12 +28,13 @@ import {
 } from '@chakra-ui/react';
 import { Trash2, Plus, Save, Download } from 'lucide-react';
 import { Tables } from '@/types/supabase';
+import { PaymentSettings } from '@/types/profile'; 
 import { InvoiceFormData } from '@/types/invoice';
 import { createQuoteAction, updateQuoteAction } from '@/app/dashboard/quotes/actions';
 import { generatePdf } from '@/utils/pdfGenerator'; 
+import PaymentMethodSelector from './PaymentMethodSelector';
 
-// 🟢 COMMANDER FIX: Allow 'null' for all extended fields to match Supabase response types
-// This resolves the "Type 'string | null' is not assignable to type 'string | undefined'" error.
+// Extended Types
 type ExtendedClient = Tables<'clients'> & { currency?: string | null };
 type ExtendedProfile = Tables<'profiles'> & { 
     currency?: string | null; 
@@ -45,15 +46,17 @@ type ExtendedProfile = Tables<'profiles'> & {
     branch_name?: string | null;
     account_type?: string | null;
     logo_url?: string | null;
+    signature_url?: string | null; // Explicitly noting this exists in Tables<'profiles'>
     company_name?: string | null;
     company_address?: string | null;
     terms_conditions?: string | null;
+    payment_settings?: PaymentSettings | null; 
 };
 
 type InvoiceFormProps = {
   profile: ExtendedProfile | null;
   clients: ExtendedClient[];
-  defaultValues?: Tables<'quotes'> | null;
+  defaultValues?: Tables<'quotes'> & { payment_link?: string | null } | null;
 };
 
 const FormSection = ({ title, children }: { title: string, children: React.ReactNode }) => {
@@ -76,6 +79,9 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   const [isNewClient, setIsNewClient] = useState(!defaultValues?.client_id && clients?.length > 0);
   
   const [activeCurrency, setActiveCurrency] = useState((defaultValues as any)?.currency || profile?.currency || 'ZAR');
+
+  // Track selected payment link
+  const [selectedPaymentLink, setSelectedPaymentLink] = useState<string | null>(null);
 
   const toast = useToast();
   const isEditing = !!defaultValues;
@@ -132,7 +138,14 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       if(client) setIsNewClient(false);
       
       if((defaultValues as any).currency) setActiveCurrency((defaultValues as any).currency);
+      
+      // LOAD SAVED LINK
+      if (defaultValues.payment_link) {
+        setSelectedPaymentLink(defaultValues.payment_link);
+      }
+
     } else {
+      // NEW DOCUMENT
       reset({
         to: { name: '', address: '', email: '' },
         lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
@@ -143,6 +156,15 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         brandColor: '#319795',
       });
       setActiveCurrency(profile?.currency || 'ZAR');
+
+      // AUTO-SELECT DEFAULT PAYMENT LINK
+      if (profile?.payment_settings?.default_provider) {
+        const defId = profile.payment_settings.default_provider;
+        const defProvider = profile.payment_settings.providers.find(p => p.id === defId);
+        if (defProvider?.url) {
+            setSelectedPaymentLink(defProvider.url);
+        }
+      }
     }
   }, [defaultValues, clients, profile, reset]);
   
@@ -166,7 +188,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     }
   };
 
-  // --- HELPER FOR INPUT SYMBOL ---
   const getCurrencySymbol = (code: string) => {
     try {
         return (0).toLocaleString('en-US', { style: 'currency', currency: code }).replace(/\d|\.|,/g, '').trim();
@@ -178,7 +199,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     try {
       const formData = getValues();
       
-      // 🟢 COMMANDER FIX: Convert potential nulls to undefined to satisfy pdfGenerator types
       const safeProfile = {
         logo: profile?.logo_url || undefined,
         name: profile?.company_name || undefined,
@@ -197,7 +217,11 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         invoiceDate: formData.invoiceDate,
         dueDate: formData.dueDate,
         logo: safeProfile.logo,
+        // 🟢 FIX: INJECT SIGNATURE URL
+        signature: profile?.signature_url || undefined, 
         currency: activeCurrency, 
+        // 🟢 PASS SELECTED LINK TO PDF PREVIEW
+        paymentLink: selectedPaymentLink, 
         from: {
           name: safeProfile.name,
           email: safeProfile.email,
@@ -240,7 +264,13 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   const onSubmit = async (data: InvoiceFormData) => {
     setIsSubmitting(true);
     try {
-      const payload = { ...data, currency: activeCurrency };
+      // INCLUDE PAYMENT LINK IN PAYLOAD
+      const payload = { 
+        ...data, 
+        currency: activeCurrency,
+        paymentLink: selectedPaymentLink // Pass this to server action
+      };
+
       if (isEditing && defaultValues) {
         await updateQuoteAction({
           quoteId: defaultValues.id, formData: payload, documentType: documentType, total: total,
@@ -304,7 +334,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
             <HStack display={{ base: 'none', md: 'flex' }} w="100%" spacing={4} color="gray.500" fontSize="xs" fontWeight="bold" letterSpacing="wide">
               <Text flex={5}>DESCRIPTION</Text>
               <Text flex={1.5} textAlign="right">QTY</Text>
-              {/* 🟢 DYNAMIC LABEL UPDATE */}
               <Text flex={2} textAlign="right">PRICE ({activeCurrency})</Text>
               <Text flex={2} textAlign="right">TOTAL</Text>
               <Box w="40px" />
@@ -324,7 +353,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
                       <Input placeholder="Qty" type="number" {...register(`lineItems.${index}.quantity`, { valueAsNumber: true })} focusBorderColor={focusBorderColor} textAlign="right" />
                   </FormControl>
                   
-                  {/* 🟢 DYNAMIC SYMBOL UPDATE */}
                   <FormControl flex={2}>
                     <InputGroup>
                         <InputLeftElement pointerEvents="none" color="gray.400" fontSize="xs" height="100%">
@@ -362,7 +390,15 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
               <Text fontWeight='bold' fontSize="sm" color={documentType === 'Invoice' ? primaryColor : 'gray.500'}>INVOICE</Text>
             </HStack>
             
-            {/* Currency Override */}
+            {/* PAYMENT METHOD SELECTOR */}
+            {documentType === 'Invoice' && (
+              <PaymentMethodSelector 
+                settings={profile?.payment_settings || null} 
+                selectedUrl={selectedPaymentLink} 
+                onChange={setSelectedPaymentLink}
+              />
+            )}
+
             <FormControl mb={4}>
                 <FormLabel fontSize="sm" color="gray.500">Currency</FormLabel>
                 <Select value={activeCurrency} onChange={(e) => setActiveCurrency(e.target.value)} size="sm">
@@ -372,7 +408,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
                     <option value="GBP">GBP (£)</option>
                     <option value="NGN">NGN (₦)</option>
                     <option value="KES">KES (KSh)</option>
-                                        <option value="GHS">GHS (₵)</option>
+                    <option value="GHS">GHS (₵)</option>
                     <option value="NAD">NAD (N$)</option>
                     <option value="BWP">BWP (P)</option>
                 </Select>

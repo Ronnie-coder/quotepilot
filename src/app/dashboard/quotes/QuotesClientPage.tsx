@@ -1,335 +1,193 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
 import {
-  Box, Heading, Button, Table, Thead, Tbody, Tr, Th, Td, TableContainer,
-  HStack, IconButton, Tag, TagLabel, TagLeftIcon, useColorModeValue,
-  Spinner, useToast, VStack, Text, Flex, Icon, InputGroup, InputLeftElement,
-  Input, InputRightElement, Select, Menu, MenuButton, MenuList, MenuItem,
-  MenuDivider, MenuGroup, chakra, Link as ChakraLink
+  Box, Table, Thead, Tbody, Tr, Th, Td, Badge, IconButton, Menu, MenuButton, MenuList, MenuItem, Button, Flex, Text, useToast, Container, Input, InputGroup, InputLeftElement, Select, useColorModeValue,
 } from '@chakra-ui/react';
-import { 
-  Plus, Eye, Download, MoreHorizontal, Search, X, CheckCircle2, AlertCircle, Send, FileText
-} from 'lucide-react';
-import NextLink from 'next/link';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { DeleteButton } from './DeleteButton';
-import { updateDocumentStatusAction, getQuoteForPdf } from './actions';
+import { MoreVertical, Search, FileText, Download, Trash2, CheckCircle, Send, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, useTransition } from 'react';
+import { deleteQuoteAction, updateDocumentStatusAction, getQuoteForPdf } from './actions';
 import { generatePdf } from '@/utils/pdfGenerator';
-import { formatCurrency } from '@/utils/formatCurrency';
-import { motion, isValidMotionProp } from 'framer-motion';
-// 🟢 IMPORT THE SHARE COMPONENT
-import ShareInvoice from '@/components/ShareInvoice'; 
+import ShareInvoice from '@/components/ShareInvoice';
+import { PaymentSettings } from '@/types/profile';
 
-// --- TYPE DEFINITIONS ---
-type DocumentStatus = 'draft' | 'sent' | 'paid' | 'overdue';
-type DocumentType = 'Quote' | 'Invoice';
-
-interface Document {
+interface Quote {
   id: string;
-  created_at: string;
-  document_type: DocumentType | string;
   invoice_number: string;
-  status: DocumentStatus | string;
+  created_at: string;
   total: number;
-  currency?: string; 
-  // 🟢 UPDATED INTERFACE
-  clients: { 
-    id?: string;
-    name: string; 
-    email?: string; 
+  status: string;
+  document_type: string;
+  currency: string;
+  payment_link?: string;
+  client_id?: string;
+  clients: {
+    name: string;
+    email?: string;
   };
 }
 
-interface QuotesClientPageProps {
-  documents: Document[]; 
+interface Props {
+  documents: Quote[];
   count: number;
   page: number;
   limit: number;
 }
 
-// --- ANIMATION WRAPPERS ---
-const MotionBox = chakra(motion.div, { shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children' });
-const MotionTr = chakra(motion.tr, { shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children' });
-const MotionFlex = chakra(motion.div, { shouldForwardProp: (prop) => isValidMotionProp(prop) || prop === 'children' });
-
-const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
-const itemVariants = { hidden: { y: 10, opacity: 0 }, visible: { y: 0, opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } } };
-
-// --- HELPER ---
-function debounce(func: (...args: any[]) => void, delay: number) {
-  let timeoutId: NodeJS.Timeout;
-  return (...args: any[]) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
-  };
-}
-
-// --- MAIN COMPONENT ---
-export default function QuotesClientPage({ documents: serverDocuments = [], count, page, limit }: QuotesClientPageProps) {
-  
-  const [documents, setDocuments] = useState<Document[]>(serverDocuments);
-  const [loadingPdfId, setLoadingPdfId] = useState<string | null>(null);
-  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const toast = useToast();
+export default function QuotesClientPage({ documents, count, page, limit }: Props) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const toast = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // Theme Colors
-  const brandColor = 'brand.500';
-  const cardBg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const theadBg = useColorModeValue('gray.50', 'gray.900');
-  const mutedText = useColorModeValue('gray.500', 'gray.400');
-  const rowHoverBg = useColorModeValue('gray.50', 'gray.700');
-
-  useEffect(() => { setDocuments(serverDocuments); }, [serverDocuments]);
-  
-  useEffect(() => {
-    const q = searchParams.get('q');
-    if (q) setSearchQuery(q);
-  }, [searchParams]);
-
-  const handleFilterChange = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value); else params.delete(key);
-    params.set('page', '1');
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
-  const debouncedSearch = useCallback(debounce(handleFilterChange, 500), [searchParams, pathname]);
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    debouncedSearch('q', e.target.value);
-  };
-
-  const clearSearch = () => {
-    setSearchQuery('');
-    handleFilterChange('q', '');
-  };
-
-  const handlePageChange = (newPage: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('page', newPage.toString());
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
-  const handleStatusUpdate = async (documentId: string, newStatus: string) => {
-    const currentDoc = documents.find(d => d.id === documentId);
-    if (currentDoc?.status === newStatus) return;
-
-    setUpdatingStatusId(documentId);
-    setDocuments(docs => docs.map(doc => doc.id === documentId ? { ...doc, status: newStatus } : doc));
-
-    const result = await updateDocumentStatusAction(documentId, newStatus);
-    if (result.success) {
-      toast({ title: 'Status Updated', status: 'success', duration: 2000, isClosable: true });
-    } else {
-      setDocuments(docs => docs.map(doc => doc.id === documentId ? { ...doc, status: currentDoc?.status || 'draft' } : doc));
-      toast({ title: 'Update Failed', description: result.error, status: 'error', isClosable: true });
-    }
-    setUpdatingStatusId(null);
-  };
-
-  const handleDownload = async (documentId: string, documentNumber: string) => {
-    setLoadingPdfId(documentId);
+  const handleDownload = async (quoteId: string) => {
+    setDownloadingId(quoteId);
     try {
-      const result = await getQuoteForPdf(documentId);
-      if (result.error || !result.quote || !result.profile) throw new Error(result.error || 'Could not retrieve document data.');
+      const result = await getQuoteForPdf(quoteId);
+      if (result.error || !result.quote || !result.profile) throw new Error(result.error || 'Data missing');
+
       const { quote, profile } = result;
 
+      let activePaymentLink = quote.payment_link;
+      if (!activePaymentLink && profile.payment_settings) {
+         const settings = profile.payment_settings as unknown as PaymentSettings;
+         if (settings.default_provider) {
+            const provider = settings.providers.find(p => p.id === settings.default_provider);
+            if (provider?.url) activePaymentLink = provider.url;
+         }
+      }
+
       const blob = await generatePdf({
-        documentType: quote.document_type as any || 'Quote',
+        documentType: quote.document_type || 'Quote',
         brandColor: quote.brand_color || '#319795', 
         invoiceNumber: quote.invoice_number,
         invoiceDate: quote.invoice_date || quote.created_at,
         dueDate: quote.due_date,
-        logo: profile.logo_url || profile.avatar_url || null, 
+        logo: profile.logo_url,
+        // 🟢 ADDED SIGNATURE MAPPING HERE
+        signature: (profile as any).signature_url, 
+        currency: quote.currency || 'USD',
+        paymentLink: activePaymentLink, 
         from: { name: profile.company_name, email: profile.email, address: profile.company_address },
         to: { name: quote.clients?.name, email: quote.clients?.email, address: quote.clients?.address },
-        lineItems: (quote.line_items as any) || [],
+        lineItems: Array.isArray(quote.line_items) ? quote.line_items : [],
         notes: quote.notes,
         vatRate: quote.vat_rate,
-        subtotal: 0,
-        vatAmount: 0,
-        total: quote.total,
-        currency: quote.currency, 
+        subtotal: 0, vatAmount: 0, total: quote.total,
         payment: { bankName: profile.bank_name, accountHolder: profile.account_holder, accNumber: profile.account_number, branchCode: profile.branch_code }
       });
 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${quote.document_type}_${documentNumber}.pdf`;
+      link.download = `${quote.document_type}_${quote.invoice_number}.pdf`;
       link.click();
       window.URL.revokeObjectURL(url);
-      toast({ title: 'PDF Downloaded', status: 'success', duration: 2000 });
+      toast({ status: 'success', title: 'Downloaded' });
     } catch (error: any) {
-      console.error(error);
-      toast({ title: 'Download Failed', description: 'Ensure settings are saved.', status: 'error' });
+      toast({ status: 'error', title: 'Download Failed', description: error.message });
     } finally {
-      setLoadingPdfId(null);
+      setDownloadingId(null);
     }
   };
 
-  const isActionDisabled = (id: string) => loadingPdfId === id || updatingStatusId === id;
-  const totalPages = Math.ceil(count / limit);
-  
-    return (
-    <MotionBox variants={containerVariants} initial="hidden" animate="visible">
-      {/* 1. HEADER */}
-      <MotionFlex variants={itemVariants} display="flex" flexDirection={{ base: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ base: 'start', md: 'center' }} mb={8} gap={4}>
-        <Box>
-          <Heading as="h1" size="xl" mb={1} letterSpacing="tight">Documents</Heading>
-          <Text color={mutedText}>Manage your quotes, invoices, and revenue.</Text>
-        </Box>
-        <Button as={NextLink} href="/quote/new" leftIcon={<Icon as={Plus} />} bg={brandColor} color="white" _hover={{ opacity: 0.9, transform: 'translateY(-1px)' }} transition="all 0.2s" px={6} shadow="md">Create Document</Button>
-      </MotionFlex>
-      
-      {/* 2. CONTROLS */}
-      <VStack as={motion.div} variants={itemVariants} spacing={4} align="stretch" mb={6}>
-        <Flex direction={{ base: 'column', md: 'row' }} gap={4}>
-          <InputGroup maxW={{ md: '350px' }}>
-            <InputLeftElement pointerEvents="none"><Icon as={Search} color="gray.400" size={18} /></InputLeftElement>
-            <Input placeholder="Search client or doc #" value={searchQuery} onChange={handleSearchChange} bg={cardBg} borderRadius="md" focusBorderColor={brandColor} />
-            {searchQuery && (<InputRightElement><IconButton aria-label="Clear search" icon={<X size={14} />} size="xs" variant="ghost" onClick={clearSearch} borderRadius="full" /></InputRightElement>)}
-          </InputGroup>
-          <Select placeholder="All Statuses" w={{ md: '200px' }} bg={cardBg} borderRadius="md" focusBorderColor={brandColor} value={searchParams.get('status') || ''} onChange={(e) => handleFilterChange('status', e.target.value)}><option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option></Select>
-          <Select placeholder="All Types" w={{ md: '200px' }} bg={cardBg} borderRadius="md" focusBorderColor={brandColor} value={searchParams.get('type') || ''} onChange={(e) => handleFilterChange('type', e.target.value)}><option value="Quote">Quote</option><option value="Invoice">Invoice</option></Select>
-        </Flex>
-      </VStack>
-
-      {/* 3. TABLE */}
-      <Box as={motion.div} variants={itemVariants} bg={cardBg} borderRadius="xl" shadow="sm" borderWidth="1px" borderColor={borderColor} overflow="hidden">
-        <TableContainer>
-          <Table variant="simple">
-            <Thead bg={theadBg}>
-              <Tr><Th>Status</Th><Th>Number</Th><Th>Client</Th><Th>Date</Th><Th isNumeric>Amount</Th><Th isNumeric>Actions</Th></Tr>
-            </Thead>
-            <Tbody>
-              {documents.length > 0 ? (
-                documents.map((doc) => (
-                  <DocumentRow key={doc.id} doc={doc} isDisabled={isActionDisabled(doc.id)} isLoadingPdf={loadingPdfId === doc.id} isUpdatingStatus={updatingStatusId === doc.id} handleStatusUpdate={handleStatusUpdate} handleDownload={handleDownload} rowHoverBg={rowHoverBg} />
-                ))
-              ) : (
-                <Tr>
-                  <Td colSpan={6} h="300px">
-                    <Flex direction="column" align="center" justify="center" h="full" gap={4}>
-                      <Box p={4} bg="gray.50" borderRadius="full">
-                        <Icon as={Search} boxSize={8} color="gray.400" />
-                      </Box>
-                      <VStack spacing={1}>
-                        <Heading size="md" color="gray.600">No Documents Found</Heading>
-                        <Text color="gray.400">Try adjusting your filters or create a new quote.</Text>
-                      </VStack>
-                    </Flex>
-                  </Td>
-                </Tr>
-              )}
-            </Tbody>
-          </Table>
-        </TableContainer>
-      </Box>
-
-      {/* 4. PAGINATION */}
-      {totalPages > 1 &&
-        <Flex as={motion.div} variants={itemVariants} justify="space-between" align="center" mt={6}>
-          <Text fontSize="sm" color={mutedText}>Showing {documents.length} of {count} results</Text>
-          <HStack>
-            <Button onClick={() => handlePageChange(page - 1)} isDisabled={page <= 1} size="sm" variant="outline">Previous</Button>
-            <Text fontSize="sm" fontWeight="bold">Page {page} of {totalPages}</Text>
-            <Button onClick={() => handlePageChange(page + 1)} isDisabled={page >= totalPages} size="sm" variant="outline">Next</Button>
-          </HStack>
-        </Flex>
+  const handleStatusUpdate = async (id: string, newStatus: string) => {
+    startTransition(async () => {
+      const result = await updateDocumentStatusAction(id, newStatus);
+      if (result.success) {
+        toast({ title: 'Status Updated', status: 'success' });
+        router.refresh();
+      } else {
+        toast({ title: 'Error', description: result.error, status: 'error' });
       }
-    </MotionBox>
-  );
-}
+    });
+  };
 
-// --- SUB-COMPONENT: DOCUMENT ROW ---
-interface DocumentRowProps {
-  doc: Document;
-  isDisabled: boolean;
-  isLoadingPdf: boolean;
-  isUpdatingStatus: boolean;
-  handleStatusUpdate: (id: string, status: string) => void;
-  handleDownload: (id: string, num: string) => void;
-  rowHoverBg: string;
-}
+  const handleDelete = async (id: string) => {
+    if(!confirm('Are you sure you want to delete this document?')) return;
+    startTransition(async () => {
+      const result = await deleteQuoteAction(id);
+      if(result.success) { toast({ title: 'Deleted', status: 'success' }); router.refresh(); }
+    });
+  };
 
-const DocumentRow = ({ doc, isDisabled, isLoadingPdf, isUpdatingStatus, handleStatusUpdate, handleDownload, rowHoverBg }: DocumentRowProps) => {
-  const statusLower = doc.status?.toLowerCase() || 'draft';
-  let statusConfig = { color: 'gray', icon: FileText, label: 'DRAFT' };
-  
-  switch (statusLower) {
-    case 'sent': statusConfig = { color: 'blue', icon: Send, label: 'SENT' }; break;
-    case 'paid': statusConfig = { color: 'green', icon: CheckCircle2, label: 'PAID' }; break;
-    case 'overdue': statusConfig = { color: 'red', icon: AlertCircle, label: 'OVERDUE' }; break;
-    default: statusConfig = { color: 'gray', icon: FileText, label: 'DRAFT' };
-  }
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'paid': return 'green';
+      case 'sent': return 'blue';
+      case 'overdue': return 'red';
+      default: return 'gray';
+    }
+  };
 
-  const formattedDate = new Date(doc.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+  const bg = useColorModeValue('white', 'gray.800');
+  const hoverBg = useColorModeValue('gray.50', 'gray.700');
 
   return (
-    <MotionTr variants={itemVariants} _hover={{ bg: rowHoverBg }}>
-      <Td>
-        <Tag size="sm" colorScheme={statusConfig.color} borderRadius="full" px={3} py={1}>
-          <TagLeftIcon boxSize="12px" as={statusConfig.icon} />
-          <TagLabel fontWeight="bold" fontSize="10px">{statusConfig.label}</TagLabel>
-        </Tag>
-      </Td>
-      <Td fontWeight="medium" fontSize="sm">{doc.invoice_number}<Tag ml={2} size="sm" variant="outline" colorScheme="gray" fontSize="xs">{doc.document_type === 'Invoice' ? 'INV' : 'QT'}</Tag></Td>
-      
-      {/* 🟢 CLICKABLE CLIENT NAME */}
-      <Td fontSize="sm">
-        {doc.clients.id ? (
-          <ChakraLink as={NextLink} href={`/dashboard/clients/${doc.clients.id}`} color="blue.500" fontWeight="medium" _hover={{ textDecoration: 'underline' }}>
-             {doc.clients.name}
-          </ChakraLink>
-        ) : (
-          <Text color="gray.600">{doc.clients.name}</Text>
-        )}
-      </Td>
+    <Container maxW="container.xl" py={8}>
+      <Flex justify="space-between" align="center" mb={8}>
+        <Box>
+            <Text fontSize="2xl" fontWeight="bold">Documents</Text>
+            <Text color="gray.500">Manage your quotes, invoices, and revenue.</Text>
+        </Box>
+        <Button colorScheme="teal" onClick={() => router.push('/quote/new')}>+ Create Document</Button>
+      </Flex>
 
-      <Td fontSize="sm" color="gray.500">{formattedDate}</Td>
-      <Td isNumeric fontWeight="bold" fontFamily="mono" color="gray.700">
-        {formatCurrency(doc.total, doc.currency)}
-      </Td>
+      <Box bg={bg} borderRadius="lg" borderWidth="1px" overflowX="auto">
+        <Table variant="simple">
+          <Thead bg={useColorModeValue('gray.50', 'gray.700')}>
+            <Tr><Th>Status</Th><Th>Number</Th><Th>Client</Th><Th>Date</Th><Th isNumeric>Amount</Th><Th isNumeric>Actions</Th></Tr>
+          </Thead>
+          <Tbody>
+            {documents.map((doc) => (
+              <Tr 
+                key={doc.id} 
+                _hover={{ bg: hoverBg, cursor: 'pointer' }}
+                onClick={() => router.push(`/quote/${doc.id}`)}
+              >
+                <Td><Badge colorScheme={getStatusColor(doc.status)}>{doc.status}</Badge></Td>
+                <Td fontWeight="medium">{doc.invoice_number}</Td>
+                
+                <Td 
+                  color="blue.400" 
+                  fontWeight="bold"
+                  cursor="pointer"
+                  onClick={(e) => {
+                    e.stopPropagation(); 
+                    if (doc.client_id) {
+                        router.push(`/dashboard/clients/${doc.client_id}`);
+                    }
+                  }}
+                  _hover={{ textDecoration: 'underline', color: 'blue.300' }}
+                >
+                  <Flex align="center" gap={2}>
+                    {doc.clients?.name}
+                    <ExternalLink size={14} />
+                  </Flex>
+                </Td>
 
-      {/* 🟢 ACTIONS COLUMN WITH SHARE BUTTON */}
-      <Td isNumeric>
-        <HStack justify="flex-end" spacing={1}>
-            <ShareInvoice 
-                quoteId={doc.id}
-                invoiceNumber={doc.invoice_number}
-                clientName={doc.clients.name}
-                clientEmail={doc.clients.email} // Now available from the updated server query
-                isIconOnly={true}
-            />
-
-            <Menu autoSelect={false} placement="bottom-end">
-            <MenuButton as={IconButton} aria-label="Actions" icon={<Icon as={MoreHorizontal} />} variant="ghost" size="sm" isDisabled={isDisabled} />
-            <MenuList fontSize="sm" shadow="lg" borderColor="gray.200">
-                <MenuItem as={NextLink} href={`/quote/${doc.id}`} icon={<Icon as={Eye} boxSize={4} />}>View / Edit</MenuItem>
-                <MenuItem onClick={() => handleDownload(doc.id, doc.invoice_number)} icon={isLoadingPdf ? <Spinner size="xs" /> : <Icon as={Download} boxSize={4} />} isDisabled={isLoadingPdf}>
-                {isLoadingPdf ? 'Generating...' : 'Download PDF'}
-                </MenuItem>
-                <MenuDivider />
-                <MenuGroup title="Update Status">
-                {statusLower !== 'sent' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'sent')} icon={<Icon as={Send} boxSize={4} color="blue.500" />}>Mark as Sent</MenuItem>)}
-                {statusLower !== 'paid' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'paid')} icon={<Icon as={CheckCircle2} boxSize={4} color="green.500" />}>Mark as Paid</MenuItem>)}
-                {statusLower !== 'draft' && (<MenuItem onClick={() => handleStatusUpdate(doc.id, 'draft')} icon={<Icon as={FileText} boxSize={4} color="gray.500" />}>Mark as Draft</MenuItem>)}
-                </MenuGroup>
-                <MenuDivider />
-                <DeleteButton quoteId={doc.id} clientName={doc.clients.name} isDisabled={isDisabled} />
-            </MenuList>
-            </Menu>
-        </HStack>
-      </Td>
-    </MotionTr>
+                <Td>{new Date(doc.created_at).toLocaleDateString()}</Td>
+                <Td isNumeric fontWeight="bold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: doc.currency || 'USD' }).format(doc.total || 0)}</Td>
+                <Td isNumeric onClick={(e) => e.stopPropagation()}>
+                    <Flex justify="flex-end" gap={2}>
+                        <ShareInvoice quoteId={doc.id} invoiceNumber={doc.invoice_number} clientName={doc.clients?.name} clientEmail={doc.clients?.email} isIconOnly={true} />
+                        <Menu>
+                            <MenuButton as={IconButton} icon={<MoreVertical size={16} />} variant="ghost" size="sm" isLoading={downloadingId === doc.id} />
+                            <MenuList>
+                                <MenuItem icon={<FileText size={16} />} onClick={() => router.push(`/quote/${doc.id}`)}>Edit / View</MenuItem>
+                                <MenuItem icon={<Download size={16} />} onClick={() => handleDownload(doc.id)}>Download PDF</MenuItem>
+                                <MenuItem icon={<CheckCircle size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Paid')}>Mark as Paid</MenuItem>
+                                <MenuItem icon={<Send size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Sent')}>Mark as Sent</MenuItem>
+                                <MenuItem icon={<Trash2 size={16} />} color="red.500" onClick={() => handleDelete(doc.id)}>Delete</MenuItem>
+                            </MenuList>
+                        </Menu>
+                    </Flex>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      </Box>
+    </Container>
   );
-};
+}

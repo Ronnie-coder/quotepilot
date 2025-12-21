@@ -7,11 +7,10 @@ type PageProps = {
   params: { id: string };
 };
 
-// 🟢 NEW: GENERATE METADATA FOR WHATSAPP/SOCIALS
+// METADATA GENERATION
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const supabase = createSupabaseServerClient();
   
-  // Fetch just enough info for the preview card
   const { data: quote } = await supabase
     .from('quotes')
     .select('invoice_number, document_type, profiles(company_name)')
@@ -20,10 +19,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!quote) return { title: 'QuotePilot Document' };
 
-  // 🟢 FIX: Cast to 'any' to bypass TypeScript "never" error on joined relations
   const anyQuote = quote as any;
-
-  // Handle array/object quirk for profiles safely
   const profileData = Array.isArray(anyQuote.profiles) 
     ? anyQuote.profiles[0] 
     : anyQuote.profiles;
@@ -38,7 +34,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       title: `${type} #${number} from ${company}`,
       description: 'Secure Payment Link',
-      // Ensure 'og-image.png' exists in your /public folder
       images: ['/og-image.png'], 
     },
   };
@@ -47,13 +42,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function PublicQuotePage({ params }: PageProps) {
   const supabase = createSupabaseServerClient();
 
-  // 1. Fetch Quote
+  // 1. Fetch Quote & Explicitly ask for signature_url
   const { data: rawQuote, error } = await supabase
     .from("quotes")
     .select(`
       *,
       clients ( * ),
-      profiles ( * )
+      profiles ( *, signature_url ) 
     `)
     .eq("id", params.id)
     .single();
@@ -73,6 +68,7 @@ export default async function PublicQuotePage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center py-10 px-4">
+      {/* Passing the full quote object (which now includes signature_url) */}
       <PublicView quote={quote} />
     </div>
   );

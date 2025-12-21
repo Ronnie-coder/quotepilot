@@ -87,7 +87,7 @@ const Footer = () => {
   `;
 
   // 🟢 LOCKED VERSION: Mission Complete v3.0.0
-  const appVersion = "v3.0.0";
+  const appVersion = "v3.2.0";
 
   // Animation Variants
   const containerVariants = {

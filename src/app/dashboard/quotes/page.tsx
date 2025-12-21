@@ -17,7 +17,7 @@ export default async function QuotesPage({
     redirect('/sign-in');
   }
 
-  // 1. GET PROFILE SETTINGS (To know the "System Default" currency)
+  // 1. GET PROFILE SETTINGS (System Currency)
   const { data: profile } = await supabase
     .from('profiles')
     .select('currency')
@@ -34,12 +34,20 @@ export default async function QuotesPage({
   const offset = (page - 1) * limit;
 
   // 2. FETCH DOCUMENTS
-  // 🟢 COMMANDER UPDATE: We added 'id' and 'email' to the clients fetch
+  // 🟢 COMMANDER FIX: Added 'client_id' and 'payment_link' to the selection
   let query = supabase
     .from('quotes')
     .select(
       `
-      id, created_at, document_type, invoice_number, status, total, currency,
+      id, 
+      created_at, 
+      document_type, 
+      invoice_number, 
+      status, 
+      total, 
+      currency,
+      payment_link,
+      client_id,
       clients ( id, name, email ) 
     `,
       { count: 'exact' }
@@ -53,9 +61,11 @@ export default async function QuotesPage({
   if (statusFilter === 'overdue') {
     query = query
       .lt('due_date', new Date().toISOString())
-      .neq('status', 'Paid');
+      .neq('status', 'Paid')
+      .neq('status', 'paid');
   } else if (statusFilter) {
-    query = query.eq('status', statusFilter);
+    // Case insensitive filtering
+    query = query.ilike('status', statusFilter);
   }
   
   if (typeFilter) {
@@ -74,12 +84,13 @@ export default async function QuotesPage({
   // 3. FORMATTING LOGIC
   const formattedDocuments =
     (documents as any[])?.map((doc: any) => {
-      // Handle the array vs object quirk from Supabase
       const clientData = Array.isArray(doc.clients) ? doc.clients[0] : doc.clients;
       
       return {
         ...doc,
         currency: doc.currency || systemCurrency,
+        // Ensure client_id is explicitly passed if missing from top level (fallback to joined object)
+        client_id: doc.client_id || clientData?.id,
         clients: clientData || { name: 'Unknown Client', email: '', id: '' },
       };
     }) || [];

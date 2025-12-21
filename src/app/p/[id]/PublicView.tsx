@@ -1,27 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
-  Box, 
-  Button, 
-  Flex, 
-  Heading, 
-  Text, 
-  Table, 
-  Thead, 
-  Tbody, 
-  Tr, 
-  Th, 
-  Td, 
-  Container,
-  Badge,
-  useToast,
-  Image,
-  useColorModeValue,
-  Divider,
-  HStack
+  Box, Button, Flex, Heading, Text, Table, Thead, Tbody, Tr, Th, Td, 
+  Container, Badge, useToast, Image, useColorModeValue, Stack, SimpleGrid, Icon
 } from "@chakra-ui/react";
 import { generatePdf, PdfData } from "@/utils/pdfGenerator";
+import { ExternalLink, CreditCard, QrCode } from "lucide-react"; 
+import QRCode from "qrcode"; 
 
 // Icon for Download Button
 const DownloadIcon = () => (
@@ -36,6 +22,7 @@ interface PublicViewProps {
 
 export default function PublicView({ quote }: PublicViewProps) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const toast = useToast();
   const safeNum = (val: any) => Number(val) || 0;
 
@@ -53,6 +40,25 @@ export default function PublicView({ quote }: PublicViewProps) {
   const currency = quote.currency || "ZAR";
   const notes = quote.notes || ""; 
 
+  // --- PAYMENT LINK LOGIC ---
+  let activePaymentLink = quote.payment_link; 
+  if (!activePaymentLink && profile.payment_settings) {
+    const settings = profile.payment_settings;
+    if (settings.default_provider) {
+        const provider = settings.providers.find((p: any) => p.id === settings.default_provider);
+        if (provider) activePaymentLink = provider.url;
+    }
+  }
+
+  // Generate QR for Display
+  useEffect(() => {
+    if (activePaymentLink) {
+        QRCode.toDataURL(activePaymentLink, { margin: 1, color: { dark: '#000000', light: '#ffffff00' } })
+            .then(setQrCodeUrl)
+            .catch(err => console.error("QR Generation failed", err));
+    }
+  }, [activePaymentLink]);
+
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
@@ -63,6 +69,8 @@ export default function PublicView({ quote }: PublicViewProps) {
         dueDate: quote.due_date,
         currency: currency,
         logo: profile.logo_url, 
+        signature: profile.signature_url, 
+        paymentLink: activePaymentLink, 
         from: {
           name: profile.company_name || "Freelancer",
           address: profile.company_address,
@@ -114,16 +122,16 @@ export default function PublicView({ quote }: PublicViewProps) {
 
   return (
     <Container maxW="4xl" py={10}>
-      {/* Top Bar */}
       <Flex justify="space-between" align="center" mb={6}>
          <Badge colorScheme="blue" fontSize="sm" px={3} py={1} borderRadius="full">Public Invoice</Badge>
          <Button 
             leftIcon={<DownloadIcon />}
-            colorScheme="brand"
+            colorScheme="gray"
+            variant="outline"
             isLoading={isDownloading}
             loadingText="Generating..."
             onClick={handleDownload}
-            shadow="md"
+            size="sm"
          >
             Download PDF
          </Button>
@@ -132,122 +140,163 @@ export default function PublicView({ quote }: PublicViewProps) {
       {/* MAIN CARD */}
       <Box bg={bgCard} shadow="xl" rounded="lg" overflow="hidden" borderWidth="1px" borderColor={borderColor}>
         
-        {/* Header Section */}
+        {/* 1. HEADER */}
         <Box bg={bgHeader} p={8} borderBottomWidth="1px" borderColor={borderColor}>
-           <Flex justify="space-between" align="start" direction={{ base: 'column-reverse', md: 'row' }} gap={6}>
-              <Box>
-                 <Heading size="lg" color={textColor} mb={1}>INVOICE</Heading>
-                 <Text color={mutedColor} fontWeight="medium">#{quote.invoice_number}</Text>
-              </Box>
-              <Box textAlign={{ base: 'left', md: 'right' }}>
-                 {profile.logo_url && (
-                   <Flex justify={{ base: 'flex-start', md: 'flex-end' }} mb={4}>
-                      <Image src={profile.logo_url} alt="Company Logo" maxH="60px" objectFit="contain" />
-                   </Flex>
-                 )}
-                 <Heading size="md" color="brand.500" mb={1}>{profile.company_name || "Company Name"}</Heading>
-                 <Text fontSize="sm" color={mutedColor}>{profile.company_phone}</Text>
-                 <Text fontSize="sm" color={mutedColor} whiteSpace="pre-wrap">{profile.company_address}</Text>
-              </Box>
-           </Flex>
-        </Box>
+            <Flex justify="space-between" align="start" direction={{ base: 'column', md: 'row' }} gap={6}>
+            <Box>
+                {/* USER LOGO */}
+                {profile.logo_url && (
+                <Image src={profile.logo_url} alt="Company Logo" maxH="50px" objectFit="contain" mb={4} />
+                )}
+                <Heading size="md" color="brand.500" mb={1}>{profile.company_name || "Company Name"}</Heading>
+                <Stack spacing={0} fontSize="sm" color={mutedColor}>
+                    <Text>{profile.company_address}</Text>
+                    <Text>{profile.company_phone}</Text>
+                    <Text>{profile.email}</Text>
+                </Stack>
+            </Box>
 
-        {/* Info Grid */}
-        <Box p={8}>
-            <Flex direction={{ base: 'column', md: 'row' }} justify="space-between" gap={8}>
-                <Box flex="1">
-                   <Text fontSize="xs" fontWeight="bold" color="gray.400" textTransform="uppercase" letterSpacing="wide" mb={2}>Billed To</Text>
-                   <Text fontSize="lg" fontWeight="bold" color={textColor}>{client.name || "No Name"}</Text>
-                   <Text color={mutedColor}>{client.email}</Text>
-                   <Text color={mutedColor} whiteSpace="pre-wrap" mt={1}>{client.address}</Text>
-                </Box>
-                <Box textAlign={{ base: 'left', md: 'right' }}>
-                   <Box mb={4}>
-                      <Text fontSize="sm" color="gray.500">Date Issued</Text>
-                      <Text fontWeight="medium" color={textColor}>{quote.created_at ? new Date(quote.created_at).toLocaleDateString() : 'N/A'}</Text>
-                   </Box>
-                   <Box>
-                      <Text fontSize="sm" color="gray.500">Due Date</Text>
-                      <Text fontWeight="medium" color="red.500">{quote.due_date ? new Date(quote.due_date).toLocaleDateString() : 'N/A'}</Text>
-                   </Box>
-                </Box>
+            <Box textAlign={{ base: 'left', md: 'right' }}>
+                <Heading size="2xl" color={textColor} letterSpacing="tight">INVOICE</Heading>
+                <Text fontSize="xl" color={mutedColor} fontWeight="medium" mb={2}>#{quote.invoice_number}</Text>
+                
+                <Stack spacing={1} mt={4} fontSize="sm">
+                <Flex justify={{ base: 'flex-start', md: 'flex-end' }}>
+                    <Text color={mutedColor} w="80px">Date:</Text>
+                    <Text fontWeight="bold">{new Date(quote.created_at).toLocaleDateString()}</Text>
+                </Flex>
+                {quote.due_date && (
+                    <Flex justify={{ base: 'flex-start', md: 'flex-end' }}>
+                        <Text color={mutedColor} w="80px">Due:</Text>
+                        <Text fontWeight="bold" color="red.500">{new Date(quote.due_date).toLocaleDateString()}</Text>
+                    </Flex>
+                )}
+                </Stack>
+                {quote.status && <Badge mt={4} fontSize="0.9em" colorScheme={quote.status === 'Paid' ? 'green' : 'orange'}>{quote.status}</Badge>}
+            </Box>
             </Flex>
         </Box>
 
-        {/* Items Table */}
-        <Box px={8} pb={8}>
+        {/* 2. ADDRESS BLOCK */}
+        <Box p={8}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
+                <Box>
+                    <Text fontSize="xs" fontWeight="bold" color="gray.400" textTransform="uppercase" letterSpacing="wider" mb={2}>Bill To</Text>
+                    <Heading size="sm" mb={1}>{client.name || "Valued Client"}</Heading>
+                    <Text fontSize="sm" color={mutedColor} whiteSpace="pre-wrap">{client.address}</Text>
+                    <Text fontSize="sm" color={mutedColor}>{client.email}</Text>
+                </Box>
+            </SimpleGrid>
+        </Box>
+
+        {/* 3. ITEMS TABLE */}
+        <Box px={8} mb={8}>
             <Table variant="simple" size="md">
                 <Thead bg={useColorModeValue("gray.50", "gray.700")}>
                     <Tr>
-                        <Th color="gray.500">Description</Th>
-                        <Th color="gray.500" isNumeric>Price</Th>
-                        <Th color="gray.500" textAlign="center">Qty</Th>
-                        <Th color="gray.500" isNumeric>Total</Th>
+                        <Th pl={0}>Description</Th>
+                        <Th isNumeric>Price</Th>
+                        <Th textAlign="center">Qty</Th>
+                        <Th isNumeric pr={0}>Total</Th>
                     </Tr>
                 </Thead>
                 <Tbody>
                     {quote.items && quote.items.length > 0 ? (
                         quote.items.map((item: any, index: number) => (
                             <Tr key={index}>
-                                <Td color={textColor} fontWeight="medium">{item.description}</Td>
-                                <Td color={mutedColor} isNumeric>{safeNum(item.unitPrice || item.price).toFixed(2)}</Td>
-                                <Td color={mutedColor} textAlign="center">{item.quantity}</Td>
-                                <Td color={textColor} fontWeight="bold" isNumeric>{(safeNum(item.unitPrice || item.price) * safeNum(item.quantity)).toFixed(2)}</Td>
+                                <Td pl={0} fontWeight="medium">{item.description}</Td>
+                                <Td isNumeric>{safeNum(item.unitPrice || item.price).toFixed(2)}</Td>
+                                <Td textAlign="center">{item.quantity}</Td>
+                                <Td fontWeight="bold" isNumeric pr={0}>{(safeNum(item.unitPrice || item.price) * safeNum(item.quantity)).toFixed(2)}</Td>
                             </Tr>
                         ))
                     ) : (
-                        <Tr><Td colSpan={4} textAlign="center" py={8} color="gray.400" fontStyle="italic">No items found.</Td></Tr>
+                        <Tr><Td colSpan={4} textAlign="center">No items found.</Td></Tr>
                     )}
                 </Tbody>
             </Table>
         </Box>
 
-        {/* Totals Section */}
+        {/* 4. FOOTER (Signature & Payment) */}
         <Box bg={bgHeader} p={8} borderTopWidth="1px" borderColor={borderColor}>
-            <Flex justify="flex-end">
-                <Box width="300px">
-                    <Flex justify="space-between" align="center" borderTopWidth="2px" borderColor={borderColor} pt={2} mt={2}>
-                        <Text fontSize="lg" fontWeight="bold" color={textColor}>Total</Text>
-                        <Text fontSize="2xl" fontWeight="bold" color="brand.500">{currency} {totalAmount.toFixed(2)}</Text>
-                    </Flex>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10}>
+            
+            {/* LEFT: Bank & USER SIGNATURE */}
+            <Box>
+                {profile.bank_name && (
+                <Box bg={bgCard} p={4} rounded="md" borderWidth="1px" borderColor={borderColor} shadow="sm" mb={6}>
+                    <Text fontSize="xs" fontWeight="bold" color="green.600" textTransform="uppercase" mb={3}>Payment Details</Text>
+                    <Stack spacing={1} fontSize="sm">
+                        <Flex justify="space-between"><Text color={mutedColor}>Bank:</Text><Text fontWeight="medium">{profile.bank_name}</Text></Flex>
+                        <Flex justify="space-between"><Text color={mutedColor}>Account:</Text><Text fontWeight="medium">{profile.account_number}</Text></Flex>
+                        {profile.branch_code && (
+                        <Flex justify="space-between"><Text color={mutedColor}>Branch:</Text><Text fontWeight="medium">{profile.branch_code}</Text></Flex>
+                        )}
+                    </Stack>
                 </Box>
-            </Flex>
-        </Box>
+                )}
+                {notes && (
+                <Box mb={6}>
+                    <Text fontSize="xs" fontWeight="bold" color="gray.400" textTransform="uppercase" mb={2}>Notes</Text>
+                    <Text fontSize="sm" color={mutedColor}>{notes}</Text>
+                </Box>
+                )}
+                
+                {/* DISPLAY USER SIGNATURE */}
+                {profile.signature_url && (
+                    <Box mt={8}>
+                        <Text fontSize="xs" fontWeight="bold" color="gray.400" textTransform="uppercase" mb={2}>Authorized Signature</Text>
+                        <Image src={profile.signature_url} alt="Signature" maxH="60px" />
+                    </Box>
+                )}
+            </Box>
 
-        {/* FOOTER & BRANDING */}
-        <Box p={8} borderTopWidth="1px" borderColor={borderColor}>
-           
-           {notes && (
-             <Box mb={6}>
-                <Text fontSize="xs" fontWeight="bold" color="gray.400" textTransform="uppercase" letterSpacing="wide" mb={2}>Notes / Terms</Text>
-                <Text fontSize="sm" color={mutedColor} whiteSpace="pre-wrap">{notes}</Text>
-             </Box>
-           )}
+            {/* RIGHT: Totals & Actions */}
+            <Box textAlign="right">
+                <Stack spacing={2} mb={6}>
+                    <Flex justify="space-between">
+                        <Text color={mutedColor}>Subtotal</Text>
+                        <Text fontWeight="medium">{currency} {totalAmount.toFixed(2)}</Text>
+                    </Flex>
+                    <Flex justify="space-between" align="center">
+                        <Text fontSize="xl" fontWeight="bold">Total</Text>
+                        <Text fontSize="3xl" fontWeight="extrabold" color="brand.600">{currency} {totalAmount.toFixed(2)}</Text>
+                    </Flex>
+                </Stack>
 
-           <Divider mb={6} />
+                {activePaymentLink && quote.document_type === 'Invoice' && (
+                <Flex direction="column" gap={4} align="flex-end">
+                    
+                    {/* BUTTON */}
+                    <Button
+                        as="a"
+                        href={activePaymentLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        colorScheme="green"
+                        size="lg"
+                        width="full"
+                        h="50px"
+                        fontSize="md"
+                        rightIcon={<Icon as={CreditCard} />}
+                        shadow="md"
+                        _hover={{ transform: 'translateY(-2px)', shadow: 'lg' }}
+                    >
+                        PAY INVOICE NOW
+                    </Button>
+                    
+                    {/* QR CODE - CLEAN LAYOUT */}
+                    {qrCodeUrl && (
+                        <Flex align="center" justify="flex-end" gap={3} width="100%">
+                             <Text fontSize="xs" color="gray.500" textAlign="right">Scan to Pay<br/>Instantly</Text>
+                             <Image src={qrCodeUrl} alt="Payment QR" boxSize="50px" rounded="md" border="1px solid" borderColor="gray.100" />
+                        </Flex>
+                    )}
+                </Flex>
+                )}
+            </Box>
 
-           <Box textAlign="center">
-             {profile.bank_name && (
-                 <Text fontSize="xs" color="gray.500" mb={4}>
-                     <strong>Banking Details:</strong> {profile.bank_name} | <strong>Acc:</strong> {profile.account_number}
-                     {profile.branch_code && ` | Branch: ${profile.branch_code}`}
-                 </Text>
-             )}
-             
-             {/* 🟢 VISUAL BRANDING - "Powered by" */}
-             <HStack justify="center" spacing={2} opacity={0.8} mt={2}>
-                 <Text fontSize="xs" color="gray.400">Powered by</Text>
-                 <Image 
-                    src="/logo.png" // Ensure this is in /public
-                    alt="QuotePilot Logo" 
-                    height="16px" 
-                    width="auto"
-                    objectFit="contain" 
-                 />
-                 <Text fontSize="xs" fontWeight="bold" color="gray.500">QuotePilot</Text>
-             </HStack>
-
-           </Box>
+            </SimpleGrid>
         </Box>
 
       </Box>
