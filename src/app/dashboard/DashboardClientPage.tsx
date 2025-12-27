@@ -243,7 +243,6 @@ export default function DashboardClientPage({
                     </HStack>
                     <Badge colorScheme="brand" variant="subtle">Last 6 Months</Badge>
                 </Flex>
-                {/* 🟢 FIX: Fixed container height */}
                 <Box h="300px" w="100%">
                   {revenueData && revenueData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -257,7 +256,14 @@ export default function DashboardClientPage({
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={borderColor === 'gray.700' ? '#2D3748' : '#E2E8F0'} />
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: textColor === 'gray.400' ? '#A0AEC0' : '#718096', fontSize: 12 }} dy={10} />
                         <YAxis hide />
-                        <Tooltip contentStyle={{ backgroundColor: tooltipBg, borderRadius: '8px', border: `1px solid ${tooltipBorder}`, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} labelStyle={{ color: headingColor, fontWeight: 'bold' }} itemStyle={{ color: tooltipText }} formatter={(value: number) => [formatCurrency(value, currency), 'Revenue']} cursor={{ stroke: brand500, strokeWidth: 1 }} />
+                        {/* 🟢 FIX: Updated formatter type to satisfy Recharts strict typing */}
+                        <Tooltip 
+                            contentStyle={{ backgroundColor: tooltipBg, borderRadius: '8px', border: `1px solid ${tooltipBorder}`, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
+                            labelStyle={{ color: headingColor, fontWeight: 'bold' }} 
+                            itemStyle={{ color: tooltipText }} 
+                            formatter={(value: any) => [formatCurrency(Number(value) || 0, currency), 'Revenue']} 
+                            cursor={{ stroke: brand500, strokeWidth: 1 }} 
+                        />
                         <Area type="monotone" dataKey="value" stroke={brand500} fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={3} />
                       </AreaChart>
                     </ResponsiveContainer>
@@ -270,7 +276,6 @@ export default function DashboardClientPage({
               {/* Pie Chart with FIX */}
               <Flex direction="column" bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={borderColor} shadow="sm" p={6} h="full" minH="400px" minWidth={0}>
                 <HStack mb={4}><Icon as={PieChartIcon} color="orange.400" boxSize={5} /><Heading size="md" color={headingColor}>Invoice Health</Heading></HStack>
-                {/* 🟢 FIX: Fixed container height */}
                 <Box h="300px" w="100%" position="relative">
                   {totalInvoices > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
