@@ -7,7 +7,6 @@ import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, useActionState } from 'react'; 
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-// 🟢 FIX: Import Database directly instead of the missing 'Tables' helper
 import { Database } from '@/types/supabase';
 
 import { uploadLogoAction, uploadSignatureAction } from './actions';
@@ -18,7 +17,6 @@ import { Building, Banknote, FileText, UploadCloud, Save, Link as LinkIcon, Chec
 import { motion } from 'framer-motion';
 import { PaymentSettings, PaymentProviderType } from '@/types/profile';
 
-// 🟢 FIX: Manually derive the Profile Row type
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
 type ProfileWithBanking = ProfileRow & {
@@ -136,8 +134,18 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     default_provider: null
   };
 
-  const mergedSettings = profile?.payment_settings 
-    ? { ...defaultPaymentSettings, ...profile.payment_settings, providers: defaultPaymentSettings.providers.map(p => { const saved = profile.payment_settings?.providers.find(sp => sp.id === p.id); return saved || p; }) }
+  // 🟢 FIX: Force cast the settings to PaymentSettings to avoid 'Spread types' error
+  const rawSettings = profile?.payment_settings as unknown as PaymentSettings | null;
+
+  const mergedSettings = rawSettings 
+    ? { 
+        ...defaultPaymentSettings, 
+        ...rawSettings, 
+        providers: defaultPaymentSettings.providers.map(p => { 
+          const saved = rawSettings.providers?.find(sp => sp.id === p.id); 
+          return saved || p; 
+        }) 
+      }
     : defaultPaymentSettings;
 
   const [paymentConfig, setPaymentConfig] = useState<PaymentSettings>(mergedSettings);
