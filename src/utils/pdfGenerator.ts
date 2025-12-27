@@ -1,53 +1,21 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import QRCode from 'qrcode'; 
+import { InvoicePdfPayload } from '@/types/invoice';
 
 // 🟢 CONFIGURATION: Your QuotePilot Logo
-const QUOTEPILOT_LOGO_URL = "https://quotepilot.coderon.co.za/logo.png"; 
+const QUOTEPILOT_LOGO_URL = "https://mjcyhwryzgpaqqdyydgl.supabase.co/storage/v1/object/public/logos/f4f5147c-7548-4159-9456-271b0c8f9366/logo-1763033850740.png"; 
 
-// 1.0 TYPE DEFINITIONS
-export interface PdfData {
-  documentType: 'Invoice' | 'Quote';
-  brandColor?: string;
-  currency?: string; 
-  invoiceNumber?: string | null;
-  invoiceDate?: string | null;
-  dueDate?: string | null;
-  logo?: string | null;       
-  paymentLink?: string | null;
-  signature?: string | null;  
-  from: {
-    name?: string | null;
-    address?: string | null;
-    email?: string | null;
-    phone?: string | null;
-  };
-  to: {
-    name?: string | null;
-    address?: string | null;
-    email?: string | null;
-  };
-  lineItems: {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-  }[];
-  notes?: string | null;
-  vatRate?: number | null;
-  payment?: {
-    bankName?: string | null;
-    accountHolder?: string | null;
-    accNumber?: string | null;
-    branchCode?: string | null;
-    branchName?: string | null;
-    accountType?: string | null;
-  };
-  subtotal: number;
-  vatAmount: number;
-  total: number;
-}
+// 1.0 HELPERS
 
-// 2.0 HELPERS
+// 🟢 NEW: Lightweight Phone Validation
+// Prevents rendering invalid "Tel:" lines (e.g., empty strings, or just "N/A")
+const validatePhone = (phone?: string | null): string | null => {
+  if (!phone) return null;
+  const clean = phone.trim();
+  // Must have at least 6 digits to be considered a printable phone number
+  const digitCount = clean.replace(/\D/g, '').length;
+  if (digitCount < 6) return null; 
+  return clean;
+};
+
 const formatCurrency = (amount: number, currencyCode = 'ZAR') => {
   try {
     return new Intl.NumberFormat('en-US', {
@@ -84,17 +52,24 @@ const getBase64FromUrl = async (url: string): Promise<string | null> => {
 
 const generateQR = async (text: string): Promise<string> => {
   try {
+    const QRCode = (await import('qrcode')).default || await import('qrcode');
+    // @ts-ignore
     return await QRCode.toDataURL(text, { margin: 0 });
   } catch (err) {
     return '';
   }
 }
 
-// 3.0 THE GENERATOR ENGINE
-export const generatePdf = async (data: PdfData): Promise<Blob> => {
+// 2.0 THE GENERATOR ENGINE
+// Uses strict InvoicePdfPayload to ensure data consistency
+export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
+  const jsPDF = (await import('jspdf')).default;
+  const autoTable = (await import('jspdf-autotable')).default;
+
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
   // --- BRAND IDENTITY ---
+  // Fallback to Teal if brandColor is missing/empty
   const COLOR_PRIMARY = data.brandColor || '#319795'; 
   const COLOR_TEXT_MAIN = '#1A202C'; 
   const COLOR_TEXT_MUTED = '#718096'; 
@@ -136,38 +111,74 @@ export const generatePdf = async (data: PdfData): Promise<Blob> => {
 
   yPos += 45; 
 
-  // --- 2. ADDRESSES ---
+  // --- 2. ADDRESSES (REWRITTEN FOR PERFECT ALIGNMENT) ---
   const colWidth = (pageWidth - (margin * 2)) / 2;
+  const startAddressY = yPos;
 
-  // FROM
-  doc.setFontSize(8);
-  doc.setTextColor(COLOR_PRIMARY);
-  doc.setFont('helvetica', 'bold');
-  doc.text('FROM', margin, yPos);
-  doc.setFontSize(10);
-  doc.setTextColor(COLOR_TEXT_MAIN);
-  doc.text(data.from.name || '', margin, yPos + 5);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(COLOR_TEXT_MUTED);
-  const fromAddress = doc.splitTextToSize(data.from.address || '', colWidth - 5);
-  doc.text(fromAddress, margin, yPos + 10);
-  doc.text(data.from.email || '', margin, yPos + 10 + (fromAddress.length * 4));
+  // Helper to render an address block dynamically
+  const renderAddressBlock = (
+      title: string, 
+      details: { name?: string | null, address?: string | null, email?: string | null, phone?: string | null }, 
+      x: number, 
+      y: number
+  ) => {
+      let currentY = y;
+      
+      // LABEL (FROM / BILL TO)
+      doc.setFontSize(8);
+      doc.setTextColor(COLOR_PRIMARY);
+      doc.setFont('helvetica', 'bold');
+      doc.text(title, x, currentY);
+      currentY += 5;
 
-  // TO
-  doc.setFontSize(8);
-  doc.setTextColor(COLOR_PRIMARY);
-  doc.setFont('helvetica', 'bold');
-  doc.text('BILL TO', margin + colWidth, yPos);
-  doc.setFontSize(10);
-  doc.setTextColor(COLOR_TEXT_MAIN);
-  doc.text(data.to.name || '', margin + colWidth, yPos + 5);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(COLOR_TEXT_MUTED);
-  const toAddress = doc.splitTextToSize(data.to.address || '', colWidth - 5);
-  doc.text(toAddress, margin + colWidth, yPos + 10);
-  doc.text(data.to.email || '', margin + colWidth, yPos + 10 + (toAddress.length * 4));
+      // NAME
+      doc.setFontSize(10);
+      doc.setTextColor(COLOR_TEXT_MAIN);
+      doc.text(details.name || '', x, currentY);
+      currentY += 5;
 
-  yPos = Math.max(yPos + 30, yPos + 15 + (Math.max(fromAddress.length, toAddress.length) * 4));
+      // ADDRESS (Multi-line)
+      if (details.address) {
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(COLOR_TEXT_MUTED);
+          const addressLines = doc.splitTextToSize(details.address, colWidth - 5);
+          doc.text(addressLines, x, currentY);
+          currentY += (addressLines.length * 4.5);
+      } else {
+        currentY += 2; // small gap if no address
+      }
+
+      // CONTACT INFO (Phone/Email) with Icons/Labels
+      const contactStart = currentY + 1;
+      
+      if (details.email) {
+          doc.setFontSize(9);
+          doc.setTextColor(COLOR_TEXT_MUTED);
+          doc.text(`Email: ${details.email}`, x, contactStart);
+          currentY = contactStart + 5;
+      }
+      
+      // 🟢 VALIDATION: Check phone before rendering
+      const validPhone = validatePhone(details.phone);
+      if (validPhone) {
+          const phoneY = details.email ? currentY : contactStart;
+          doc.setFontSize(9);
+          doc.setTextColor(COLOR_TEXT_MUTED);
+          doc.text(`Tel: ${validPhone}`, x, phoneY);
+          currentY = phoneY + 5;
+      }
+
+      return currentY;
+  };
+
+  // Render FROM
+  const fromBottomY = renderAddressBlock('FROM', data.from, margin, startAddressY);
+
+  // Render TO
+  const toBottomY = renderAddressBlock('BILL TO', data.to, margin + colWidth, startAddressY);
+
+  // Set yPos to the lowest point of either column + padding
+  yPos = Math.max(fromBottomY, toBottomY) + 10;
 
   // --- 3. ITEMS TABLE ---
   const tableData = data.lineItems.map(item => [
@@ -257,7 +268,7 @@ export const generatePdf = async (data: PdfData): Promise<Blob> => {
     }
   }
 
-  // -- RIGHT COLUMN: Financials (DYNAMIC SPACING FIX) --
+  // -- RIGHT COLUMN: Financials --
   let rightY = finalY;
 
   // 1. Subtotal
@@ -270,7 +281,6 @@ export const generatePdf = async (data: PdfData): Promise<Blob> => {
   doc.text(subtotalStr, rightColX, rightY, { align: 'right' });
   
   doc.setTextColor(COLOR_TEXT_MUTED);
-  // Position Label: X = RightEdge - ValueWidth - 5mm Padding
   doc.text('Subtotal:', rightColX - subWidth - 5, rightY, { align: 'right' });
 
   // 2. VAT
@@ -285,23 +295,19 @@ export const generatePdf = async (data: PdfData): Promise<Blob> => {
     doc.text(`VAT (${data.vatRate}%):`, rightColX - vatWidth - 5, rightY, { align: 'right' });
   }
 
-  // 3. Total (DYNAMIC FIX)
+  // 3. Total
   rightY += 10;
   const totalStr = formatCurrency(data.total, CURRENCY);
   
-  // Set font for Value to calculate width accurately
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   const totalWidth = doc.getTextWidth(totalStr);
   
-  // Render Value
   doc.setTextColor(COLOR_PRIMARY);
   doc.text(totalStr, rightColX, rightY, { align: 'right' });
 
-  // Render Label (Relative to Value Width)
   doc.setFontSize(12);
   doc.setTextColor(COLOR_TEXT_MAIN);
-  // Push label left based on value width + 6mm padding
   doc.text('Total:', rightColX - totalWidth - 6, rightY, { align: 'right' });
 
   if(data.dueDate) {
@@ -312,7 +318,7 @@ export const generatePdf = async (data: PdfData): Promise<Blob> => {
      doc.text(`Due by ${formatDate(data.dueDate)}`, rightColX, rightY, { align: 'right' });
   }
 
-  // QR CODE (15mm size, clean alignment)
+  // QR CODE
   if (data.paymentLink) {
     const btnY = rightY + 10;
     const btnWidth = 40;
@@ -330,7 +336,6 @@ export const generatePdf = async (data: PdfData): Promise<Blob> => {
         doc.text("SCAN TO PAY", qrX + (qrSize/2), btnY - 3, { align: 'center' });
     }
 
-    // BUTTON
     doc.setFillColor(COLOR_PRIMARY);
     doc.roundedRect(btnX, btnY, btnWidth, btnHeight, 1, 1, 'F');
     doc.setTextColor('#FFFFFF');
@@ -340,40 +345,23 @@ export const generatePdf = async (data: PdfData): Promise<Blob> => {
     doc.link(btnX, btnY, btnWidth, btnHeight, { url: data.paymentLink });
   }
 
-  // --- 5. FOOTER BRANDING (Perfected Alignment & Dynamic Color) ---
+  // --- 5. FOOTER BRANDING ---
   const footerY = pageHeight - margin;
   
-  if (QUOTEPILOT_LOGO_URL) {
-      const qpLogo = await getBase64FromUrl(QUOTEPILOT_LOGO_URL);
-      if (qpLogo) {
-          const logoSize = 8;
-          // Calculate precise alignment relative to text baseline
-          const textWidth = doc.getTextWidth("QuotePilot");
-          const spacing = 2;
-          
-          const textX = pageWidth - margin - textWidth;
-          const logoX = textX - logoSize - spacing;
-          
-          // Align middle of logo with middle of text cap-height
-          const baseY = footerY - 5; 
-          doc.addImage(qpLogo, 'PNG', logoX, baseY - logoSize + 2.5, logoSize, logoSize);
-          
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(COLOR_PRIMARY); // 🟢 Dynamic User Color
-          doc.text('QuotePilot', pageWidth - margin, baseY, { align: 'right' });
-      }
-  } else {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(COLOR_PRIMARY);
-      doc.text('QuotePilot', pageWidth - margin, footerY - 5, { align: 'right' });
+  const platformLogo = await getBase64FromUrl(QUOTEPILOT_LOGO_URL);
+  if (platformLogo) {
+      try {
+          const h = 7; 
+          const props = doc.getImageProperties(platformLogo);
+          const w = (props.width * h) / props.height;
+          doc.addImage(platformLogo, 'PNG', margin, footerY - h, w, h);
+      } catch(e) {}
   }
 
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(COLOR_TEXT_MUTED);
-  doc.text("Building Africa's Ambition.", pageWidth - margin, footerY, { align: 'right' });
+  doc.text("Sent with QuotePilot — Get paid faster", pageWidth - margin, footerY, { align: 'right' });
 
   return doc.output('blob');
 };

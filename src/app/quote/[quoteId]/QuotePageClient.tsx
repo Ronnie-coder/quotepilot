@@ -3,7 +3,8 @@
 import { Box, Heading, Text, VStack, HStack, Button, Icon } from '@chakra-ui/react';
 import { InvoiceForm } from '@/components/InvoiceForm'; 
 import DocumentViewer from '@/components/DocumentViewer';
-import ShareInvoice from '@/components/ShareInvoice'; 
+import ShareInvoice from '@/components/ShareInvoice';
+import InvoiceReminder from '@/components/InvoiceReminder';
 import NextLink from 'next/link';
 import { FilePenLine, ArrowLeft } from 'lucide-react';
 import { Tables } from '@/types/supabase';
@@ -25,6 +26,12 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
   const primaryColor = 'brand.500';
   const primaryTextColor = 'white';
 
+  // Helper to format currency for the reminder
+  const formatAmount = (amt: number | null, currency: string = 'ZAR') => {
+    if (amt === null) return `${currency} 0.00`;
+    return `${currency} ${Number(amt).toFixed(2)}`;
+  };
+
   return (
     <VStack spacing={8} align="stretch">
       {/* HEADER SECTION */}
@@ -38,15 +45,26 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
           </Text>
         </Box>
         
-        <HStack spacing={3}>
-           {/* 1. Share Button Integrated in Header */}
+        <HStack spacing={2}>
+           {/* 1. Share Button & Reminder Integrated in Header */}
            {isViewing && (
-             <ShareInvoice 
-               quoteId={quote.id} 
-               clientName={quote.clients?.name || "Client"} 
-               invoiceNumber={quote.invoice_number || ""}
-               clientEmail={quote.clients?.email || ""}
-             />
+             <>
+               <InvoiceReminder 
+                  quoteId={quote.id}
+                  invoiceNumber={quote.invoice_number || ""}
+                  clientName={quote.clients?.name || "Client"}
+                  amount={formatAmount(quote.total, quote.currency)}
+                  dueDate={quote.due_date}
+                  clientEmail={quote.clients?.email}
+               />
+               
+               <ShareInvoice 
+                 quoteId={quote.id} 
+                 clientName={quote.clients?.name || "Client"} 
+                 invoiceNumber={quote.invoice_number || ""}
+                 clientEmail={quote.clients?.email || ""}
+               />
+             </>
            )}
 
           <Button as={NextLink} href="/dashboard/quotes" variant="outline" leftIcon={<Icon as={ArrowLeft} />}>
@@ -54,7 +72,14 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
           </Button>
 
           {isViewing && (
-            <Button as={NextLink} href={`/dashboard/quote/${quote.id}`} bg={primaryColor} color={primaryTextColor} _hover={{ opacity: 0.9 }} leftIcon={<Icon as={FilePenLine} />}>
+            <Button 
+              as={NextLink} 
+              href={`/quote/${quote.id}?edit=true`} 
+              bg={primaryColor} 
+              color={primaryTextColor} 
+              _hover={{ opacity: 0.9 }} 
+              leftIcon={<Icon as={FilePenLine} />}
+            >
               Edit
             </Button>
           )}

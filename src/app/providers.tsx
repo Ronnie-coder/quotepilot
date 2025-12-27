@@ -7,7 +7,7 @@ import NextTopLoader from 'nextjs-toploader';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ChakraProvider theme={theme}>
+    <>
       <NextTopLoader
         color="#319795" // TACTICAL UPGRADE: Synced with new brand.500
         initialPosition={0.08}
@@ -18,7 +18,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         easing="ease"
         speed={200}
       />
-      {children}
-    </ChakraProvider>
+      <ChakraProvider theme={theme}>
+        {children}
+      </ChakraProvider>
+    </>
   );
 }

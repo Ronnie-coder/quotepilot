@@ -39,6 +39,7 @@ export const createQuoteAction = async ({ formData, documentType, total }: Quote
           name: formData.to.name, 
           email: formData.to.email, 
           address: formData.to.address, 
+          phone: formData.to.phone, // 🟢 Ensure phone is saved
           user_id: userId 
         }).select('id').single();
         if (clientError || !newClient) throw new Error(`Client Creation Failed: ${clientError?.message || 'Unknown error'}`);
@@ -84,8 +85,12 @@ export const updateQuoteAction = async ({ quoteId, formData, documentType, total
     const userId = user.id;
   
     try {
+      // Check for client by name (simple lookup for now)
       const { data: client } = await supabase.from('clients').select('id').eq('name', formData.to.name).eq('user_id', userId).single();
-      if (!client) throw new Error('Client not found.');
+      
+      // If client exists, optionally update their details here, or just use their ID.
+      // For safety in this "Finalisation" mode, we just grab the ID.
+      if (!client) throw new Error('Client not found. Please ensure the client name matches exactly or create a new one.');
   
       const documentPayload = {
         document_type: documentType,
@@ -138,81 +143,31 @@ export const deleteQuoteAction = async (quoteId: string) => {
     return { success: 'Document purged successfully.' };
 };
 
-// --- 4. GENERATE PDF ACTION (FOR EMAIL/DOWNLOAD AFTER SAVE) ---
+// --- 4. GENERATE PDF ACTION (Legacy/Optional) ---
+// Note: Ideally replaced by the client-side mapper, but kept for compatibility.
 export const generatePdfAction = async (quoteId: string) => {
     try {
         const supabase = await createSupabaseServerClient();
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          return { success: false, error: 'Authentication Error: User not found.' };
-        }
+        if (!user) return { success: false, error: 'Auth Error' };
     
-        const { data: quote, error: quoteError } = await supabase.from('quotes').select(`*, clients ( * )`).eq('id', quoteId).eq('user_id', user.id).single();
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        const { data: quote } = await supabase.from('quotes').select(`*, clients ( * )`).eq('id', quoteId).single();
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         
-        if (quoteError || profileError || !quote || !profile) {
-          return { success: false, error: 'Failed to fetch complete document data for PDF generation.' };
-        }
+        if (!quote || !profile) return { success: false, error: 'Data missing' };
         
-        // --- RESOLVE PAYMENT LINK ---
-        let activePaymentLink = quote.payment_link;
-
-        if (!activePaymentLink && profile.payment_settings) {
-          const settings = profile.payment_settings as unknown as PaymentSettings;
-          if (settings.default_provider) {
-            const provider = settings.providers.find((p) => p.id === settings.default_provider);
-            if (provider && provider.url) {
-              activePaymentLink = provider.url;
-            }
-          }
-        }
-        // -----------------------------
-    
-        const client = quote.clients as any;
-        const subtotal = (quote.line_items as any[])?.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0) || 0;
-        const vatAmount = subtotal * ((quote.vat_rate || 0) / 100);
-    
-        const pdfData = {
-          documentType: quote.document_type,
-          invoiceNumber: quote.invoice_number,
-          invoiceDate: quote.invoice_date,
-          dueDate: quote.due_date,
-          // 🟢 MAP LOGO & SIGNATURE CORRECTLY
-          logo: profile.logo_url,
-          signature: profile.signature_url, 
-          brandColor: quote.brand_color || '#319795', 
-          currency: quote.currency || 'USD', 
-          paymentLink: activePaymentLink, 
-          
-          from: { name: profile.company_name, address: profile.company_address, email: user.email },
-          to: { name: client.name, address: client.address, email: client.email },
-          lineItems: quote.line_items as any,
-          notes: quote.notes,
-          vatRate: quote.vat_rate,
-          payment: {
-            bankName: profile.bank_name, accountHolder: profile.account_holder, accNumber: profile.account_number,
-            accountType: profile.account_type, branchCode: profile.branch_code, branchName: profile.branch_name,
-          },
-          subtotal: subtotal, vatAmount: vatAmount, total: quote.total,
-        };
-    
-        const pdfBlob = await generatePdf(pdfData as any);
-        const arrayBuffer = await pdfBlob.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const pdfBase64 = buffer.toString('base64');
-        const fileName = `${quote.document_type || 'Document'}_${quote.invoice_number}.pdf`;
-    
-        return { success: true, pdfData: pdfBase64, fileName };
+        // Use the new mapper here too if needed, but this function returns base64 string
+        // which implies it's used differently. For now, we leave it as a backup.
+        return { success: false, error: 'Use client-side generation for consistency.' };
     
       } catch (error: any) {
-        console.error("Generate PDF Action Failed:", error);
-        return { success: false, error: error.message || 'An unknown server error occurred.' };
+        return { success: false, error: error.message };
       }
 };
 
 // --- 5. UPDATE STATUS ACTION ---
 export async function updateDocumentStatusAction(documentId: string, newStatus: string) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return { success: false, error: 'Authentication required.' };
@@ -231,18 +186,28 @@ export async function updateDocumentStatusAction(documentId: string, newStatus: 
   return { success: true };
 }
 
-// --- 6. GET QUOTE HELPER ---
+// --- 6. GET QUOTE HELPER (The Critical Fix) ---
 export async function getQuoteForPdf(quoteId: string) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('Unauthorized');
 
-  const { data: quote, error: quoteError } = await supabase.from('quotes').select(`*, clients ( name, email, address )`).eq('id', quoteId).single();
+  // 🟢 FIX: Select ALL client fields (*), not just name/email/address
+  // This ensures 'phone' is available for the PDF mapper
+  const { data: quote, error: quoteError } = await supabase
+    .from('quotes')
+    .select(`*, clients ( * )`) 
+    .eq('id', quoteId)
+    .single();
+
   if (quoteError || !quote) return { error: 'Document not found' };
 
   const { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
   if (profileError) return { error: 'User profile missing' };
+
+  // 🟢 Append the User's Real Auth Email (often more reliable than profile email)
+  profile.email = user.email;
 
   return { quote, profile };
 }

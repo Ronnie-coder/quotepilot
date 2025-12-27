@@ -5,7 +5,7 @@ import { IconButton, useToast, Icon } from '@chakra-ui/react';
 import { Download, Loader2 } from 'lucide-react';
 import { getQuoteForPdf } from '@/app/dashboard/quotes/actions';
 import { generatePdf } from '@/utils/pdfGenerator';
-import { PaymentSettings } from '@/types/profile';
+import { mapToPdfPayload } from '@/utils/pdfMapper'; // 🟢 IMPORT MAPPER
 
 export default function DownloadInvoiceButton({ quoteId }: { quoteId: string }) {
   const [loading, setLoading] = useState(false);
@@ -20,43 +20,16 @@ export default function DownloadInvoiceButton({ quoteId }: { quoteId: string }) 
 
       const { quote, profile } = result;
 
-      // 1. Check Invoice Row First
-      let activePaymentLink = quote.payment_link; 
+      // 🟢 USE THE MAPPER
+      // Note: We use profile.email if available, or fall back to empty string if type is strict
+      const pdfPayload = mapToPdfPayload(
+        quote, 
+        profile, 
+        quote.clients, // Pass the full client object
+        profile.email || '' // Pass email explicitly
+      );
 
-      // 2. Fallback to Profile Default
-      if (!activePaymentLink && profile.payment_settings) {
-        const settings = profile.payment_settings as unknown as PaymentSettings;
-        if (settings.default_provider) {
-          const provider = settings.providers.find((p) => p.id === settings.default_provider);
-          if (provider?.url) activePaymentLink = provider.url;
-        }
-      }
-
-      // 🟢 Force type casting if TS complains about signature_url not being in the 'Tables' type yet
-      const profileWithSig = profile as any;
-
-      const blob = await generatePdf({
-        documentType: quote.document_type || 'Quote',
-        brandColor: quote.brand_color || '#319795', 
-        invoiceNumber: quote.invoice_number,
-        invoiceDate: quote.invoice_date || quote.created_at,
-        dueDate: quote.due_date,
-        logo: profile.logo_url,
-        // 🟢 PASS SIGNATURE HERE
-        signature: profileWithSig.signature_url, 
-        currency: quote.currency || 'USD',
-        paymentLink: activePaymentLink, 
-        
-        from: { name: profile.company_name, email: profile.email, address: profile.company_address },
-        to: { name: quote.clients?.name, email: quote.clients?.email, address: quote.clients?.address },
-        lineItems: Array.isArray(quote.line_items) ? quote.line_items : [],
-        notes: quote.notes,
-        vatRate: quote.vat_rate,
-        subtotal: 0, 
-        vatAmount: 0,
-        total: quote.total,
-        payment: { bankName: profile.bank_name, accountHolder: profile.account_holder, accNumber: profile.account_number, branchCode: profile.branch_code }
-      });
+      const blob = await generatePdf(pdfPayload);
 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

@@ -20,6 +20,7 @@ type Client = {
   name: string | null;
   email: string | null;
   address?: string | null; 
+  phone?: string | null; // 🟢 Added Phone Type
   revenueBreakdown: { currency: string; amount: number }[];
 };
 
@@ -67,6 +68,7 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
 
+  // 🟢 FIX: Call hooks at the top level
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const rowHoverBg = useColorModeValue('gray.50', 'gray.700');
@@ -74,6 +76,7 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
   const textColor = useColorModeValue('gray.600', 'gray.400');
   const primaryColor = useColorModeValue('brand.500', 'brand.300'); 
   const headingColor = useColorModeValue('gray.800', 'white');
+  const iconBg = useColorModeValue('brand.50', 'whiteAlpha.100'); // 🟢 Moved out of loop
 
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -132,8 +135,8 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
       {/* Header */}
       <Flex as={motion.div} variants={itemVariants} direction={{ base: 'column', md: 'row' }} justify="space-between" align={{ base: 'start', md: 'center' }} mb={8} gap={4}>
         <Box>
-          <Heading as="h1" size="xl" color={headingColor} letterSpacing="tight">Client Dossier</Heading>
-          <Text color={textColor} mt={1}>Manage your client roster and view key financial data.</Text>
+          <Heading as="h1" size="xl" color={headingColor} letterSpacing="tight">Clients</Heading>
+          <Text color={textColor} mt={1}>Manage relationships and track revenue.</Text>
         </Box>
         <Button onClick={onAddOpen} leftIcon={<Icon as={Plus} />} colorScheme="brand" px={6} shadow="md">
           Add New Client
@@ -192,7 +195,8 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
                   >
                     <Td py={4}>
                         <HStack>
-                            <Box p={2} bg={useColorModeValue('brand.50', 'whiteAlpha.100')} rounded="lg" color={primaryColor}>
+                            {/* 🟢 FIX: Use pre-calculated variable */}
+                            <Box p={2} bg={iconBg} rounded="lg" color={primaryColor}>
                                 <Icon as={UserIcon} size={16} />
                             </Box>
                             <Text fontWeight="bold" color={headingColor}>{client.name}</Text>
@@ -205,17 +209,14 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
                         </HStack>
                     </Td>
                     
-                    {/* 🟢 COMMANDER UPGRADE: Clean, Badged Currency Stack */}
                     <Td py={4} isNumeric>
                         {client.revenueBreakdown && client.revenueBreakdown.length > 0 ? (
                            <VStack align="end" spacing={2}>
                              {client.revenueBreakdown.map((item, index) => (
                                <HStack key={item.currency} spacing={2}>
-                                  {/* Small Badge for Currency Code */}
                                   <Tag size="sm" variant="subtle" colorScheme={index === 0 ? "brand" : "gray"} borderRadius="full">
                                       <TagLabel fontSize="xs" fontWeight="bold">{item.currency}</TagLabel>
                                   </Tag>
-                                  {/* The formatted amount */}
                                   <Text 
                                     fontWeight="bold" 
                                     color={headingColor} 
@@ -224,13 +225,12 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
                                     opacity={index === 0 ? 1 : 0.8}
                                   >
                                     {formatCurrency(item.amount, item.currency).replace(item.currency, '').trim()} 
-                                    {/* .replace helps avoid double printing if formatter includes code, ensuring clean look */}
                                   </Text>
                                </HStack>
                              ))}
                            </VStack>
                         ) : (
-                            <Badge colorScheme="gray">NO ACTIVITY</Badge>
+                            <Badge variant="subtle" colorScheme="gray" fontSize="xs" fontWeight="medium" textTransform="none">No Revenue Yet</Badge>
                         )}
                     </Td>
 

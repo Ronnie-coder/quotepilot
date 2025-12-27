@@ -1,6 +1,8 @@
-// DEFINITIVE REFINEMENT: src/styles/theme.ts
+'use client';
+
 import { extendTheme, type ThemeConfig } from '@chakra-ui/react';
 
+// Manual mode helper to avoid dependency issues
 const mode = (light: string, dark: string) => (props: { colorMode: 'light' | 'dark' }) => {
   return props.colorMode === 'dark' ? dark : light;
 };

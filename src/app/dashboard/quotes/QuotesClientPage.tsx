@@ -1,9 +1,9 @@
 'use client';
 
 import {
-  Box, Table, Thead, Tbody, Tr, Th, Td, Badge, IconButton, Menu, MenuButton, MenuList, MenuItem, Button, Flex, Text, useToast, Container, Input, InputGroup, InputLeftElement, Select, useColorModeValue,
+  Box, Table, Thead, Tbody, Tr, Th, Td, Badge, IconButton, Menu, MenuButton, MenuList, MenuItem, Button, Flex, Text, useToast, Container, Input, InputGroup, InputLeftElement, Select, useColorModeValue, VStack, Icon,
 } from '@chakra-ui/react';
-import { MoreVertical, Search, FileText, Download, Trash2, CheckCircle, Send, ExternalLink } from 'lucide-react';
+import { MoreVertical, Search, FileText, Download, Trash2, CheckCircle, Send, ExternalLink, FileQuestion } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { deleteQuoteAction, updateDocumentStatusAction, getQuoteForPdf } from './actions';
@@ -24,6 +24,7 @@ interface Quote {
   clients: {
     name: string;
     email?: string;
+    phone?: string; // 🟢 Added phone to type
   };
 }
 
@@ -48,6 +49,7 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
 
       const { quote, profile } = result;
 
+      // Determine Payment Link
       let activePaymentLink = quote.payment_link;
       if (!activePaymentLink && profile.payment_settings) {
          const settings = profile.payment_settings as unknown as PaymentSettings;
@@ -57,24 +59,43 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
          }
       }
 
+      // Generate PDF
       const blob = await generatePdf({
-        documentType: quote.document_type || 'Quote',
+        documentType: (quote.document_type as 'Invoice' | 'Quote') || 'Quote',
         brandColor: quote.brand_color || '#319795', 
         invoiceNumber: quote.invoice_number,
         invoiceDate: quote.invoice_date || quote.created_at,
         dueDate: quote.due_date,
         logo: profile.logo_url,
-        // 🟢 ADDED SIGNATURE MAPPING HERE
         signature: (profile as any).signature_url, 
         currency: quote.currency || 'USD',
         paymentLink: activePaymentLink, 
-        from: { name: profile.company_name, email: profile.email, address: profile.company_address },
-        to: { name: quote.clients?.name, email: quote.clients?.email, address: quote.clients?.address },
-        lineItems: Array.isArray(quote.line_items) ? quote.line_items : [],
+        
+        from: { 
+            name: profile.company_name, 
+            email: profile.email, 
+            address: profile.company_address,
+            phone: (profile as any).company_phone // 🟢 FIX: Pass User Phone
+        },
+        to: { 
+            name: quote.clients?.name, 
+            email: quote.clients?.email, 
+            address: (quote.clients as any)?.address,
+            phone: (quote.clients as any)?.phone // 🟢 FIX: Pass Client Phone
+        },
+        
+        lineItems: Array.isArray(quote.line_items) ? (quote.line_items as any[]) : [],
         notes: quote.notes,
         vatRate: quote.vat_rate,
-        subtotal: 0, vatAmount: 0, total: quote.total,
-        payment: { bankName: profile.bank_name, accountHolder: profile.account_holder, accNumber: profile.account_number, branchCode: profile.branch_code }
+        subtotal: 0, // PDF Generator calculates this
+        vatAmount: 0, // PDF Generator calculates this
+        total: quote.total,
+        payment: { 
+            bankName: profile.bank_name, 
+            accountHolder: profile.account_holder, 
+            accNumber: profile.account_number, 
+            branchCode: profile.branch_code 
+        }
       });
 
       const url = window.URL.createObjectURL(blob);
@@ -85,6 +106,7 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
       window.URL.revokeObjectURL(url);
       toast({ status: 'success', title: 'Downloaded' });
     } catch (error: any) {
+      console.error(error);
       toast({ status: 'error', title: 'Download Failed', description: error.message });
     } finally {
       setDownloadingId(null);
@@ -128,7 +150,7 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
       <Flex justify="space-between" align="center" mb={8}>
         <Box>
             <Text fontSize="2xl" fontWeight="bold">Documents</Text>
-            <Text color="gray.500">Manage your quotes, invoices, and revenue.</Text>
+            <Text color="gray.500">Track payments and manage client agreements.</Text>
         </Box>
         <Button colorScheme="teal" onClick={() => router.push('/quote/new')}>+ Create Document</Button>
       </Flex>
@@ -136,55 +158,70 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
       <Box bg={bg} borderRadius="lg" borderWidth="1px" overflowX="auto">
         <Table variant="simple">
           <Thead bg={useColorModeValue('gray.50', 'gray.700')}>
-            <Tr><Th>Status</Th><Th>Number</Th><Th>Client</Th><Th>Date</Th><Th isNumeric>Amount</Th><Th isNumeric>Actions</Th></Tr>
+            <Tr><Th>Status</Th><Th>Number</Th><Th>Client</Th><Th>Issued</Th><Th isNumeric>Amount</Th><Th isNumeric>Actions</Th></Tr>
           </Thead>
           <Tbody>
-            {documents.map((doc) => (
-              <Tr 
-                key={doc.id} 
-                _hover={{ bg: hoverBg, cursor: 'pointer' }}
-                onClick={() => router.push(`/quote/${doc.id}`)}
-              >
-                <Td><Badge colorScheme={getStatusColor(doc.status)}>{doc.status}</Badge></Td>
-                <Td fontWeight="medium">{doc.invoice_number}</Td>
-                
-                <Td 
-                  color="blue.400" 
-                  fontWeight="bold"
-                  cursor="pointer"
-                  onClick={(e) => {
-                    e.stopPropagation(); 
-                    if (doc.client_id) {
-                        router.push(`/dashboard/clients/${doc.client_id}`);
-                    }
-                  }}
-                  _hover={{ textDecoration: 'underline', color: 'blue.300' }}
+            {documents && documents.length > 0 ? (
+              documents.map((doc) => (
+                <Tr 
+                  key={doc.id} 
+                  _hover={{ bg: hoverBg, cursor: 'pointer' }}
+                  onClick={() => router.push(`/quote/${doc.id}`)}
                 >
-                  <Flex align="center" gap={2}>
-                    {doc.clients?.name}
-                    <ExternalLink size={14} />
-                  </Flex>
-                </Td>
-
-                <Td>{new Date(doc.created_at).toLocaleDateString()}</Td>
-                <Td isNumeric fontWeight="bold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: doc.currency || 'USD' }).format(doc.total || 0)}</Td>
-                <Td isNumeric onClick={(e) => e.stopPropagation()}>
-                    <Flex justify="flex-end" gap={2}>
-                        <ShareInvoice quoteId={doc.id} invoiceNumber={doc.invoice_number} clientName={doc.clients?.name} clientEmail={doc.clients?.email} isIconOnly={true} />
-                        <Menu>
-                            <MenuButton as={IconButton} icon={<MoreVertical size={16} />} variant="ghost" size="sm" isLoading={downloadingId === doc.id} />
-                            <MenuList>
-                                <MenuItem icon={<FileText size={16} />} onClick={() => router.push(`/quote/${doc.id}`)}>Edit / View</MenuItem>
-                                <MenuItem icon={<Download size={16} />} onClick={() => handleDownload(doc.id)}>Download PDF</MenuItem>
-                                <MenuItem icon={<CheckCircle size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Paid')}>Mark as Paid</MenuItem>
-                                <MenuItem icon={<Send size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Sent')}>Mark as Sent</MenuItem>
-                                <MenuItem icon={<Trash2 size={16} />} color="red.500" onClick={() => handleDelete(doc.id)}>Delete</MenuItem>
-                            </MenuList>
-                        </Menu>
+                  <Td><Badge colorScheme={getStatusColor(doc.status)}>{doc.status}</Badge></Td>
+                  <Td fontWeight="medium">#{doc.invoice_number}</Td>
+                  
+                  <Td 
+                    color="blue.400" 
+                    fontWeight="bold"
+                    cursor="pointer"
+                    onClick={(e) => {
+                      e.stopPropagation(); 
+                      if (doc.client_id) {
+                          router.push(`/dashboard/clients/${doc.client_id}`);
+                      }
+                    }}
+                    _hover={{ textDecoration: 'underline', color: 'blue.300' }}
+                  >
+                    <Flex align="center" gap={2}>
+                      {doc.clients?.name}
+                      <ExternalLink size={14} />
                     </Flex>
-                </Td>
-              </Tr>
-            ))}
+                  </Td>
+
+                  <Td>{new Date(doc.created_at).toLocaleDateString()}</Td>
+                  <Td isNumeric fontWeight="bold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: doc.currency || 'USD' }).format(doc.total || 0)}</Td>
+                  <Td isNumeric onClick={(e) => e.stopPropagation()}>
+                      <Flex justify="flex-end" gap={2}>
+                          <ShareInvoice quoteId={doc.id} invoiceNumber={doc.invoice_number} clientName={doc.clients?.name} clientEmail={doc.clients?.email} isIconOnly={true} />
+                          <Menu>
+                              <MenuButton as={IconButton} icon={<MoreVertical size={16} />} variant="ghost" size="sm" isLoading={downloadingId === doc.id} />
+                              <MenuList>
+                                  <MenuItem icon={<FileText size={16} />} onClick={() => router.push(`/quote/${doc.id}`)}>Edit / View</MenuItem>
+                                  <MenuItem icon={<Download size={16} />} onClick={() => handleDownload(doc.id)}>Download PDF</MenuItem>
+                                  <MenuItem icon={<CheckCircle size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Paid')}>Mark as Paid</MenuItem>
+                                  <MenuItem icon={<Send size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Sent')}>Mark as Sent</MenuItem>
+                                  <MenuItem icon={<Trash2 size={16} />} color="red.500" onClick={() => handleDelete(doc.id)}>Delete</MenuItem>
+                              </MenuList>
+                          </Menu>
+                      </Flex>
+                  </Td>
+                </Tr>
+              ))
+            ) : (
+                <Tr>
+                    <Td colSpan={6} h="300px" textAlign="center">
+                        <VStack spacing={4} justify="center" h="full">
+                            <Box p={4} bg="gray.50" rounded="full">
+                                <Icon as={FileQuestion} boxSize={8} color="gray.400" />
+                            </Box>
+                            <Text fontSize="lg" fontWeight="medium" color="gray.600">No documents yet</Text>
+                            <Text color="gray.400" fontSize="sm">Create your first invoice to get started.</Text>
+                            <Button size="sm" colorScheme="teal" onClick={() => router.push('/quote/new')}>Create Document</Button>
+                        </VStack>
+                    </Td>
+                </Tr>
+            )}
           </Tbody>
         </Table>
       </Box>

@@ -1,49 +1,59 @@
-// FILE: src/app/quote/[quoteId]/page.tsx (REPLACEMENT)
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { notFound, redirect } from 'next/navigation';
-import QuotePageClient from './QuotePageClient'; // Import the new dedicated client component
+import { redirect } from 'next/navigation';
+import QuotePageClient from './QuotePageClient';
 
-type QuotePageProps = {
-  params: { quoteId: string; };
-  searchParams: { view?: string };
-};
+// 🟢 FIX: Added searchParams to Props definition
+interface QuotePageProps {
+  params: Promise<{ quoteId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
 
-// The Server Component now focuses purely on data fetching and delegation.
-// It is clean and has no direct knowledge of icons or complex UI.
-export default async function EditQuotePage({ params, searchParams }: QuotePageProps) {
+export default async function QuotePage({ params, searchParams }: QuotePageProps) {
+  // 🟢 FIX: Await Supabase
   const supabase = await createSupabaseServerClient();
+  
+  // 🟢 FIX: Await Params & Search Params
+  const { quoteId } = await params;
+  const search = await searchParams; // Next.js 15+ requires awaiting searchParams
+
+  // Check if edit mode is active
+  const isEditMode = search.edit === 'true';
+
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) { redirect('/sign-in'); }
+  if (!user) redirect('/sign-in');
 
-  const isViewing = searchParams.view === 'true';
+  // Fetch Quote
+  const { data: quote, error } = await supabase
+    .from('quotes')
+    .select(`
+      *,
+      clients (*)
+    `)
+    .eq('id', quoteId)
+    .single();
 
-  const [quoteResult, profileResult, clientsResult] = await Promise.all([
-    supabase.from('quotes').select('*, clients(*)').eq('id', params.quoteId).eq('user_id', user.id).single(),
+  if (error || !quote) {
+    redirect('/dashboard/quotes');
+  }
+
+  // Security Check
+  if (quote.user_id !== user.id) {
+    redirect('/dashboard');
+  }
+
+  // Fetch Metadata
+  const [profileResult, clientsResult] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('clients').select('*').eq('user_id', user.id)
   ]);
 
-  const { data: quote, error: quoteError } = quoteResult;
-  const { data: profile } = profileResult;
-  const { data: clients } = clientsResult;
-
-  if (quoteError || !quote) {
-    console.error('Error fetching quote for edit/view:', quoteError);
-    notFound();
-  }
-  
-  const quoteWithClient = {
-    ...quote,
-    clients: Array.isArray(quote.clients) ? quote.clients[0] : quote.clients,
-  };
-
-  // Pass the clean, serializable data as props to the Client Component
   return (
     <QuotePageClient 
-      quote={quoteWithClient as any} 
-      profile={profile} 
-      clients={clients || []} 
-      isViewing={isViewing}
+      quote={quote} 
+      profile={profileResult.data} 
+      clients={clientsResult.data || []} 
+      // 🟢 FIX: Dynamically toggle view/edit mode
+      isViewing={!isEditMode} 
     />
   );
 }

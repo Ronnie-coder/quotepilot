@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation';
 import DashboardClientPage from './DashboardClientPage';
 
 export default async function DashboardPage() {
-  const supabase = createSupabaseServerClient();
+  // 🟢 FIX: Added await here
+  const supabase = await createSupabaseServerClient();
   
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -18,7 +19,6 @@ export default async function DashboardPage() {
   const { count: clientCount } = await supabase.from('clients').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
 
   // 3. FETCH ALL DOCUMENTS
-  // 🟢 We now fetch 'client_id' to restore the Client History link
   const { data: allDocs, error } = await supabase
     .from('quotes')
     .select('id, invoice_number, total, status, document_type, currency, created_at, due_date, client_id, clients(name)')
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
   const isPaid = (status: string) => status?.toLowerCase() === 'paid';
   const isDraft = (status: string) => status?.toLowerCase() === 'draft';
 
-  // 4. Calculate Financials (Case Insensitive)
+  // 4. Calculate Financials
   const totalRevenue = safeDocs
     .filter(d => isPaid(d.status))
     .reduce((acc, curr) => acc + (curr.total || 0), 0);
@@ -66,7 +66,7 @@ export default async function DashboardPage() {
       clients: { name: getClientName(inv.clients) }
     }));
 
-  // 6. Chart Data (Revenue Velocity)
+  // 6. Chart Data
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const revenueData = new Array(6).fill(0).map((_, i) => {
     const d = new Date();
@@ -80,13 +80,12 @@ export default async function DashboardPage() {
     if (point) point.value += inv.total;
   });
 
-  // 7. Invoice Health Logic
+  // 7. Status Data (USED FOR CHECKLIST LOGIC)
   const statusCounts = { Paid: 0, Overdue: 0, Sent: 0, Draft: 0 };
   const now = new Date();
 
   safeDocs.forEach((doc) => {
     let s = doc.status ? doc.status.toLowerCase() : 'draft';
-    
     if (s === 'paid') statusCounts.Paid++;
     else if (s === 'draft') statusCounts.Draft++;
     else if (doc.due_date && new Date(doc.due_date) < now) statusCounts.Overdue++;

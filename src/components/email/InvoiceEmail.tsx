@@ -6,7 +6,7 @@ import {
   Heading,
   Hr,
   Html,
-  Img, // 🟢 New Import
+  Img,
   Link,
   Preview,
   Section,
@@ -32,20 +32,20 @@ export const InvoiceEmail = ({
   senderName,
 }: InvoiceEmailProps) => {
   
-  // 🟢 Define the Base URL for images
-  // When deploying, ensure NEXT_PUBLIC_SITE_URL is set in Vercel
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://quotepilot.coderon.co.za/'; 
+  // Ensure we have a valid base URL for assets
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://quotepilot.coderon.co.za'; 
 
   return (
     <Html>
       <Head />
-      <Preview>Invoice #{invoiceNumber} from {senderName}</Preview>
+      <Preview>Invoice #{invoiceNumber} due on {dueDate} - Action Required</Preview>
       <Body style={main}>
         <Container style={container}>
-          {/* 🟢 BRAND HEADER */}
+          
+          {/* HEADER: App Logo */}
           <Section style={logoSection}>
              <Img
-                src={`${baseUrl}/logo.png`} // Ensure 'logo.png' is in your public folder
+                src={`${baseUrl}/logo.png`}
                 width="40"
                 height="40"
                 alt="QuotePilot"
@@ -54,13 +54,15 @@ export const InvoiceEmail = ({
              <Text style={brandName}>QuotePilot</Text>
           </Section>
 
-          <Heading style={h1}>New Invoice</Heading>
+          <Heading style={h1}>Invoice #{invoiceNumber}</Heading>
           
           <Text style={text}>Hi {clientName},</Text>
           <Text style={text}>
-            <strong>{senderName}</strong> has sent you an invoice for <strong>{amount}</strong>.
+            Here are the details for your invoice from <strong>{senderName}</strong>. 
+            Please arrange for payment of <strong>{amount}</strong> by the due date below.
           </Text>
 
+          {/* INVOICE STATS */}
           <Section style={statsContainer}>
             <Text style={statLabel}>INVOICE NUMBER</Text>
             <Text style={statValue}>#{invoiceNumber}</Text>
@@ -69,29 +71,24 @@ export const InvoiceEmail = ({
             <Text style={statValue}>{dueDate}</Text>
           </Section>
 
+          {/* CTA BUTTON */}
           <Section style={btnContainer}>
             <Button style={button} href={publicLink}>
-              View & Download Invoice
+              Pay Invoice Now
             </Button>
           </Section>
 
           <Text style={text}>
-            or copy this link: <Link href={publicLink} style={link}>{publicLink}</Link>
+            or pay via this link: <Link href={publicLink} style={link}>{publicLink}</Link>
           </Text>
 
           <Hr style={hr} />
 
-          {/* 🟢 BRAND FOOTER */}
+          {/* 🔥 FEATURE 2: VIRAL GROWTH FOOTER */}
           <Section style={footer}>
-            <Text style={footerText}>Powered by</Text>
-            <Img
-              src={`${baseUrl}/logo.png`}
-              width="20"
-              height="20"
-              alt="QuotePilot"
-              style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: '5px' }}
-            />
-            <Text style={{...footerText, fontWeight: 'bold', display: 'inline-block', marginLeft: '5px'}}>QuotePilot</Text>
+            <Text style={footerText}>
+              Powered by <Link href="https://quotepilot.coderon.co.za" style={footerLink}>QuotePilot</Link> — Professional Invoicing
+            </Text>
           </Section>
 
         </Container>
@@ -103,6 +100,7 @@ export const InvoiceEmail = ({
 export default InvoiceEmail;
 
 // --- STYLES ---
+
 const main = {
   backgroundColor: "#f6f9fc",
   fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
@@ -184,7 +182,7 @@ const btnContainer = {
 };
 
 const button = {
-  backgroundColor: "#319795", // Brand Color
+  backgroundColor: "#319795", // Brand Color (Teal)
   borderRadius: "5px",
   color: "#fff",
   fontSize: "16px",
@@ -212,7 +210,12 @@ const footer = {
 };
 
 const footerText = {
-  color: "#8898aa",
+  color: "#718096", // Gray.500
   fontSize: "12px",
-  display: "inline-block",
+};
+
+const footerLink = {
+  color: "#718096",
+  textDecoration: "underline",
+  fontWeight: "bold" as const,
 };

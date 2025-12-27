@@ -14,7 +14,10 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const supabase = createSupabaseServerClient();
+    // 🟢 FIX: Added 'await' here.
+    // The client creation is now async in Next.js 15+ / 16
+    const supabase = await createSupabaseServerClient();
+    
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {

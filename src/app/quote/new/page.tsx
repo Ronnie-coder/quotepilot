@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation';
 import { Box, Heading, Text, VStack } from '@chakra-ui/react';
 
 export default async function NewQuotePage() {
-  const supabase = createSupabaseServerClient();
+  // 🟢 FIX: Added await here
+  const supabase = await createSupabaseServerClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) { redirect('/sign-in'); }

@@ -1,11 +1,10 @@
-// FILE: src/app/dashboard/settings/page.tsx
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import SettingsForm from './settings-form';
-import { Box, Heading, Text, VStack } from '@chakra-ui/react';
 
 export default async function SettingsPage() {
-  const supabase = createSupabaseServerClient();
+  // 🟢 FIX: Added await here
+  const supabase = await createSupabaseServerClient();
 
   const {
     data: { user },

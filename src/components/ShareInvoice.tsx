@@ -60,8 +60,8 @@ export default function ShareInvoice({
     const origin = window.location.origin;
     const url = `${origin}/p/${quoteId}`;
     
-    // We include the public link because that page HAS the 'Pay Now' button
-    const rawMessage = `Hi ${clientName}, please find attached Invoice #${invoiceNumber}. You can view and pay online here: ${url}`;
+    // UPDATED COPY: More direct, action-oriented, and friendly for chat
+    const rawMessage = `Hi ${clientName}, sending over invoice #${invoiceNumber}. You can view details and pay securely online here: ${url}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(rawMessage)}`;
     
     window.open(whatsappUrl, '_blank');

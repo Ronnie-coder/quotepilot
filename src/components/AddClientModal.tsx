@@ -33,8 +33,9 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState(''); // 🟢 RESTORED: Phone state
   const [address, setAddress] = useState('');
-  const [currency, setCurrency] = useState('ZAR'); // Default currency
+  const [currency, setCurrency] = useState('ZAR'); // 🟢 RESTORED: Currency state
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -47,14 +48,16 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
     const payload = {
       name,
       email,
+      phone, // 🟢 RESTORED: Saving phone
       address,
-      currency, // <--- SAVING CURRENCY
+      currency, // 🟢 RESTORED: Saving currency
       user_id: user.id,
     };
 
+    // @ts-ignore: Bypassing TS check since columns are being added manually to DB
     const { data, error } = await supabase
       .from('clients')
-      .insert(payload as any) 
+      .insert(payload) 
       .select()
       .single();
 
@@ -67,6 +70,7 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
       // Reset form
       setName('');
       setEmail('');
+      setPhone('');
       setAddress('');
       setCurrency('ZAR');
     }
@@ -89,6 +93,7 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
                 onChange={(e) => setName(e.target.value)}
               />
             </FormControl>
+            
             <FormControl>
               <FormLabel>Client Email</FormLabel>
               <Input
@@ -98,8 +103,19 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
                 onChange={(e) => setEmail(e.target.value)}
               />
             </FormControl>
+
+            {/* 🟢 RESTORED: Phone Input */}
+            <FormControl>
+              <FormLabel>Phone Number</FormLabel>
+              <Input
+                type="tel"
+                placeholder="e.g., +27 82 123 4567"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </FormControl>
             
-            {/* NEW CURRENCY DROPDOWN */}
+            {/* 🟢 RESTORED: Currency Selection */}
             <FormControl>
               <FormLabel>Billing Currency</FormLabel>
               <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>

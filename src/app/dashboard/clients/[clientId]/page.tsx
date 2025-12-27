@@ -2,13 +2,17 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { notFound, redirect } from 'next/navigation';
 import ClientDetailsClientPage from './ClientDetailsClientPage';
 
+// 🟢 FIX: Update props to Promise type for Next.js 15+
 interface PageProps {
-  params: { clientId: string };
+  params: Promise<{ clientId: string }>;
 }
 
 export default async function ClientDetailsPage({ params }: PageProps) {
-  const supabase = createSupabaseServerClient();
-  const { clientId } = params;
+  // 🟢 FIX: Await the Supabase client creation
+  const supabase = await createSupabaseServerClient();
+  
+  // 🟢 FIX: Await the params object
+  const { clientId } = await params;
 
   // 1. Security Check
   const { data: { user } } = await supabase.auth.getUser();

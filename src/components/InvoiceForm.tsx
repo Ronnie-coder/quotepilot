@@ -27,6 +27,7 @@ import {
   InputLeftElement,
 } from '@chakra-ui/react';
 import { Trash2, Plus, Save, Download } from 'lucide-react';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // 🟢 Added for fetching email
 import { Tables } from '@/types/supabase';
 import { PaymentSettings } from '@/types/profile'; 
 import { InvoiceFormData } from '@/types/invoice';
@@ -35,7 +36,11 @@ import { generatePdf } from '@/utils/pdfGenerator';
 import PaymentMethodSelector from './PaymentMethodSelector';
 
 // Extended Types
-type ExtendedClient = Tables<'clients'> & { currency?: string | null };
+type ExtendedClient = Tables<'clients'> & { 
+  currency?: string | null; 
+  phone?: string | null; 
+};
+
 type ExtendedProfile = Tables<'profiles'> & { 
     currency?: string | null; 
     email?: string | null;
@@ -46,9 +51,10 @@ type ExtendedProfile = Tables<'profiles'> & {
     branch_name?: string | null;
     account_type?: string | null;
     logo_url?: string | null;
-    signature_url?: string | null; // Explicitly noting this exists in Tables<'profiles'>
+    signature_url?: string | null; 
     company_name?: string | null;
     company_address?: string | null;
+    company_phone?: string | null; 
     terms_conditions?: string | null;
     payment_settings?: PaymentSettings | null; 
 };
@@ -73,14 +79,16 @@ const FormSection = ({ title, children }: { title: string, children: React.React
 };
 
 export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProps) => {
+  const supabase = createSupabaseBrowserClient(); // 🟢 Initialize Supabase Client
   const [documentType, setDocumentType] = useState<'Quote' | 'Invoice'>(defaultValues?.document_type === 'Invoice' ? 'Invoice' : 'Quote');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isNewClient, setIsNewClient] = useState(!defaultValues?.client_id && clients?.length > 0);
   
-  const [activeCurrency, setActiveCurrency] = useState((defaultValues as any)?.currency || profile?.currency || 'ZAR');
+  // 🟢 STATE: Track Sender Email (missing in profile props)
+  const [senderEmail, setSenderEmail] = useState(profile?.email || '');
 
-  // Track selected payment link
+  const [activeCurrency, setActiveCurrency] = useState((defaultValues as any)?.currency || profile?.currency || 'ZAR');
   const [selectedPaymentLink, setSelectedPaymentLink] = useState<string | null>(null);
 
   const toast = useToast();
@@ -99,6 +107,17 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   const applyVat = watch('applyVat');
   const watchedBrandColor = watch('brandColor');
   const watchedClientName = watch('to.name'); 
+
+  // 🟢 EFFECT: Fetch Current User Email if missing
+  useEffect(() => {
+    if (!senderEmail) {
+      const getEmail = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) setSenderEmail(user.email);
+      };
+      getEmail();
+    }
+  }, [senderEmail, supabase]);
 
   // --- DYNAMIC CURRENCY SWITCHER ---
   useEffect(() => {
@@ -138,14 +157,9 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       if(client) setIsNewClient(false);
       
       if((defaultValues as any).currency) setActiveCurrency((defaultValues as any).currency);
-      
-      // LOAD SAVED LINK
-      if (defaultValues.payment_link) {
-        setSelectedPaymentLink(defaultValues.payment_link);
-      }
+      if (defaultValues.payment_link) setSelectedPaymentLink(defaultValues.payment_link);
 
     } else {
-      // NEW DOCUMENT
       reset({
         to: { name: '', address: '', email: '' },
         lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
@@ -156,14 +170,10 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         brandColor: '#319795',
       });
       setActiveCurrency(profile?.currency || 'ZAR');
-
-      // AUTO-SELECT DEFAULT PAYMENT LINK
       if (profile?.payment_settings?.default_provider) {
         const defId = profile.payment_settings.default_provider;
         const defProvider = profile.payment_settings.providers.find(p => p.id === defId);
-        if (defProvider?.url) {
-            setSelectedPaymentLink(defProvider.url);
-        }
+        if (defProvider?.url) setSelectedPaymentLink(defProvider.url);
       }
     }
   }, [defaultValues, clients, profile, reset]);
@@ -176,7 +186,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lineItems' });
 
-  // --- FORMATTER HELPER ---
   const formatMoney = (amount: number) => {
     try {
       return new Intl.NumberFormat('en-US', {
@@ -199,11 +208,15 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     try {
       const formData = getValues();
       
+      // 🟢 FIX: Find selected client to get their PHONE number
+      const selectedClient = clients.find(c => c.name === formData.to.name);
+      
       const safeProfile = {
         logo: profile?.logo_url || undefined,
         name: profile?.company_name || undefined,
-        email: profile?.email || undefined,
+        email: senderEmail || undefined, // 🟢 FIX: Use fetched sender email
         address: profile?.company_address || undefined,
+        phone: profile?.company_phone || undefined, // 🟢 FIX: Pass company phone
         bankName: profile?.bank_name || undefined,
         accountHolder: profile?.account_holder || undefined,
         accNumber: profile?.account_number || undefined,
@@ -217,17 +230,19 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         invoiceDate: formData.invoiceDate,
         dueDate: formData.dueDate,
         logo: safeProfile.logo,
-        // 🟢 FIX: INJECT SIGNATURE URL
         signature: profile?.signature_url || undefined, 
         currency: activeCurrency, 
-        // 🟢 PASS SELECTED LINK TO PDF PREVIEW
         paymentLink: selectedPaymentLink, 
         from: {
           name: safeProfile.name,
           email: safeProfile.email,
           address: safeProfile.address,
+          phone: safeProfile.phone, // 🟢 Pass to Generator
         },
-        to: formData.to,
+        to: {
+            ...formData.to,
+            phone: selectedClient?.phone || undefined, // 🟢 Pass Client Phone
+        },
         lineItems: formData.lineItems.map(item => ({
             description: item.description,
             quantity: Number(item.quantity),
@@ -264,11 +279,10 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   const onSubmit = async (data: InvoiceFormData) => {
     setIsSubmitting(true);
     try {
-      // INCLUDE PAYMENT LINK IN PAYLOAD
       const payload = { 
         ...data, 
         currency: activeCurrency,
-        paymentLink: selectedPaymentLink // Pass this to server action
+        paymentLink: selectedPaymentLink 
       };
 
       if (isEditing && defaultValues) {
@@ -282,6 +296,8 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       }
       toast({ title: 'Success!', description: `Your ${documentType} has been saved.`, status: 'success', duration: 3000, isClosable: true });
     } catch (error: any) {
+      // Ignore redirect error
+      if (error.message === 'NEXT_REDIRECT' || error.digest?.includes('NEXT_REDIRECT')) return;
       toast({ title: 'Operation Failed', description: error.message, status: 'error' });
     } finally {
       setIsSubmitting(false);
@@ -305,6 +321,9 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
                 <Text fontSize="xs" fontWeight="bold" letterSpacing="wide" color={mutedText} mb={2}>FROM</Text>
                 <Text fontWeight="bold">{profile?.company_name || 'Your Company Name'}</Text>
                 <Text fontSize="sm" color={mutedText}>{profile?.company_address || 'No address set'}</Text>
+                {/* 🟢 ADDED: Visual check for user */}
+                {senderEmail && <Text fontSize="xs" color="blue.500">{senderEmail}</Text>}
+                {profile?.company_phone && <Text fontSize="xs" color="blue.500">{profile.company_phone}</Text>}
               </Box>
 
               <Box>
@@ -390,7 +409,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
               <Text fontWeight='bold' fontSize="sm" color={documentType === 'Invoice' ? primaryColor : 'gray.500'}>INVOICE</Text>
             </HStack>
             
-            {/* PAYMENT METHOD SELECTOR */}
             {documentType === 'Invoice' && (
               <PaymentMethodSelector 
                 settings={profile?.payment_settings || null} 

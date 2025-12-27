@@ -2,22 +2,21 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import QuotesClientPage from './QuotesClientPage';
 
-export default async function QuotesPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
-  const supabase = createSupabaseServerClient();
+// 🟢 FIX: Define Props with Promise for Next.js 15+
+interface QuotesPageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default async function QuotesPage({ searchParams }: QuotesPageProps) {
+  // 🟢 FIX: Await the Supabase Client (required since cookies() is async)
+  const supabase = await createSupabaseServerClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     redirect('/sign-in');
   }
 
-  // 1. GET PROFILE SETTINGS (System Currency)
+  // 1. GET PROFILE SETTINGS
   const { data: profile } = await supabase
     .from('profiles')
     .select('currency')
@@ -26,15 +25,17 @@ export default async function QuotesPage({
 
   const systemCurrency = profile?.currency || 'USD'; 
 
-  const searchQuery = searchParams.q as string || '';
-  const statusFilter = searchParams.status as string || '';
-  const typeFilter = searchParams.type as string || '';
-  const page = parseInt(searchParams.page as string) || 1;
+  // 🟢 FIX: Await searchParams before accessing properties (Next.js 15 breaking change)
+  const params = await searchParams;
+
+  const searchQuery = (params.q as string) || '';
+  const statusFilter = (params.status as string) || '';
+  const typeFilter = (params.type as string) || '';
+  const page = parseInt(params.page as string) || 1;
   const limit = 10;
   const offset = (page - 1) * limit;
 
   // 2. FETCH DOCUMENTS
-  // 🟢 COMMANDER FIX: Added 'client_id' and 'payment_link' to the selection
   let query = supabase
     .from('quotes')
     .select(
@@ -48,6 +49,7 @@ export default async function QuotesPage({
       currency,
       payment_link,
       client_id,
+      due_date,
       clients ( id, name, email ) 
     `,
       { count: 'exact' }
@@ -64,7 +66,6 @@ export default async function QuotesPage({
       .neq('status', 'Paid')
       .neq('status', 'paid');
   } else if (statusFilter) {
-    // Case insensitive filtering
     query = query.ilike('status', statusFilter);
   }
   
@@ -78,10 +79,12 @@ export default async function QuotesPage({
 
   if (error) {
     console.error('Error fetching documents:', error);
+    // Return empty state rather than crashing
     return <QuotesClientPage documents={[]} count={0} page={1} limit={limit} />;
   }
 
-  // 3. FORMATTING LOGIC
+  // 3. FORMATTING
+  // Safely map documents, handling cases where joined client data might be missing or in different formats
   const formattedDocuments =
     (documents as any[])?.map((doc: any) => {
       const clientData = Array.isArray(doc.clients) ? doc.clients[0] : doc.clients;
@@ -89,7 +92,6 @@ export default async function QuotesPage({
       return {
         ...doc,
         currency: doc.currency || systemCurrency,
-        // Ensure client_id is explicitly passed if missing from top level (fallback to joined object)
         client_id: doc.client_id || clientData?.id,
         clients: clientData || { name: 'Unknown Client', email: '', id: '' },
       };

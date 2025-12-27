@@ -4,26 +4,23 @@ import PublicView from "./PublicView";
 import { Metadata } from 'next';
 
 type PageProps = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
-// METADATA GENERATION
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
+  const { id } = await params;
   
   const { data: quote } = await supabase
     .from('quotes')
     .select('invoice_number, document_type, profiles(company_name)')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (!quote) return { title: 'QuotePilot Document' };
 
   const anyQuote = quote as any;
-  const profileData = Array.isArray(anyQuote.profiles) 
-    ? anyQuote.profiles[0] 
-    : anyQuote.profiles;
-
+  const profileData = Array.isArray(anyQuote.profiles) ? anyQuote.profiles[0] : anyQuote.profiles;
   const company = profileData?.company_name || 'Freelancer';
   const type = anyQuote.document_type || 'Invoice';
   const number = anyQuote.invoice_number;
@@ -40,9 +37,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function PublicQuotePage({ params }: PageProps) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
+  const { id } = await params;
 
-  // 1. Fetch Quote & Explicitly ask for signature_url
+  // 1. Fetch Quote & Relations
   const { data: rawQuote, error } = await supabase
     .from("quotes")
     .select(`
@@ -50,7 +48,7 @@ export default async function PublicQuotePage({ params }: PageProps) {
       clients ( * ),
       profiles ( *, signature_url ) 
     `)
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error || !rawQuote) {
@@ -58,7 +56,12 @@ export default async function PublicQuotePage({ params }: PageProps) {
     return notFound();
   }
 
-  // 2. DATA NORMALIZATION
+  // 🟢 2. CRITICAL FIX: Fetch the User's Real Email from Auth Admin
+  // (The profiles table often doesn't have the email, but Auth does)
+  const { data: userData } = await supabase.auth.admin.getUserById(rawQuote.user_id);
+  const realUserEmail = userData?.user?.email || "";
+
+  // 3. Normalize Data
   const quote = {
     ...rawQuote,
     clients: Array.isArray(rawQuote.clients) ? rawQuote.clients[0] : rawQuote.clients,
@@ -68,8 +71,8 @@ export default async function PublicQuotePage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center py-10 px-4">
-      {/* Passing the full quote object (which now includes signature_url) */}
-      <PublicView quote={quote} />
+      {/* 🟢 PASS THE EMAIL PROP DOWN */}
+      <PublicView quote={quote} userEmail={realUserEmail} />
     </div>
   );
 }

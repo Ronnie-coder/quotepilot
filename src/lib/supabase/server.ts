@@ -2,9 +2,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 
-// 1. STANDARD SERVER CLIENT (For Server Components/Actions)
-export const createSupabaseServerClient = () => {
-  const cookieStore = cookies();
+// 🟢 FIX: This must now be async because cookies() is async in Next.js 15+
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,31 +18,33 @@ export const createSupabaseServerClient = () => {
           try {
             cookieStore.set({ name, value, ...options });
           } catch (error) {
-            // Ignored: Expected behavior in Server Components
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing user sessions.
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options });
           } catch (error) {
-            // Ignored: Expected behavior in Server Components
+            // The `delete` method was called from a Server Component.
           }
         },
       },
     }
   );
-};
+}
 
-// 2. ADMIN CLIENT (Bypasses RLS - Use with Caution)
-export const createSupabaseAdminClient = () => {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
-        }
-    );
-};
+// Admin client doesn't use cookies, so it stays synchronous usually, 
+// but good to keep it handy.
+export function createSupabaseAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}

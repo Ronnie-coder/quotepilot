@@ -2,8 +2,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import NavbarClient from './NavbarClient';
 
 export default async function Navbar() {
-  // 1. Initialize Supabase on the server
-  const supabase = createSupabaseServerClient();
+  // 🟢 FIX: Added await here
+  const supabase = await createSupabaseServerClient();
   
   // 2. Fetch the current user
   const { data: { user } } = await supabase.auth.getUser();

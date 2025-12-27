@@ -1,13 +1,15 @@
-// FILE: src/app/layout.tsx
 import type { Metadata } from 'next';
 import { Providers } from './providers';
 import { Analytics } from '@vercel/analytics/react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Container, Flex } from '@chakra-ui/react';
+import { Container, Flex, ColorModeScript } from '@chakra-ui/react';
 import AuthListener from '@/components/AuthListener';
 import BackToTop from '@/components/BackToTop';
+import { Inter } from 'next/font/google';
 
+// 🟢 FIX: Load the font so the theme can use it
+const inter = Inter({ subsets: ['latin'] });
 
 const siteUrl = 'https://quotepilot.coderon.co.za/';
 
@@ -34,10 +36,14 @@ export const metadata: Metadata = {
   icons: { icon: '/logo.svg', shortcut: '/logo.svg', apple: '/logo.svg' },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: 'React.ReactNode' }>) {
+// 🟢 FIX: Correct TypeScript type for children
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" style={{ scrollBehavior: 'smooth' }}> {/* <-- FIX 3: Smooth scrolling enabled globally --- */}
-      <body>
+    <html lang="en" style={{ scrollBehavior: 'smooth' }}>
+      <body className={inter.className}>
+        {/* 🟢 FIX: This script prevents the color mode flash on reload */}
+        <ColorModeScript initialColorMode="light" />
+        
         <Providers>
           <AuthListener />
           <Flex direction="column" minH="100vh">
@@ -48,6 +54,7 @@ export default function RootLayout({ children }: Readonly<{ children: 'React.Rea
             <Footer />
           </Flex>
         </Providers>
+        
         <Analytics />
         <BackToTop />
       </body>

@@ -1,4 +1,3 @@
-// src/app/dashboard/quotes/DeleteButton.tsx
 'use client';
 
 import {
@@ -17,12 +16,10 @@ import { DeleteIcon } from '@chakra-ui/icons';
 import React, { useTransition } from 'react';
 import { deleteQuoteAction } from './actions';
 
-// --- CORRECTION 1: Type definition updated ---
-// The component's prop interface now accepts 'isDisabled'.
 type DeleteButtonProps = {
   quoteId: string;
   clientName: string;
-  isDisabled?: boolean; // This property is now defined.
+  isDisabled?: boolean;
 };
 
 export function DeleteButton({ quoteId, clientName, isDisabled }: DeleteButtonProps) {
@@ -38,16 +35,17 @@ export function DeleteButton({ quoteId, clientName, isDisabled }: DeleteButtonPr
 
       if (result.error) {
         toast({
-          title: 'Deletion Failed',
+          title: 'Purge Failed',
           description: result.error,
           status: 'error',
           duration: 5000,
           isClosable: true,
         });
       } else {
+        // 🟢 SUCCESS TOAST ADDED
         toast({
-          title: 'Success!',
-          description: 'The document has been purged.',
+          title: 'Document Purged',
+          description: `The document for ${clientName} has been permanently removed.`,
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -64,11 +62,9 @@ export function DeleteButton({ quoteId, clientName, isDisabled }: DeleteButtonPr
         icon={<DeleteIcon />}
         size="sm"
         colorScheme="red"
+        variant="ghost"
         onClick={onOpen}
         isLoading={isPending}
-        // --- CORRECTION 2: Prop implemented ---
-        // The isDisabled prop is now passed to the underlying IconButton,
-        // correctly disabling it when other actions are in progress.
         isDisabled={isDisabled || isPending}
       />
 
@@ -76,20 +72,22 @@ export function DeleteButton({ quoteId, clientName, isDisabled }: DeleteButtonPr
         isOpen={isOpen}
         leastDestructiveRef={cancelRef}
         onClose={onClose}
+        isCentered
       >
-        <AlertDialogOverlay>
+        <AlertDialogOverlay bg="blackAlpha.300" backdropFilter="blur(2px)">
           <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Confirm Purge Protocol
+            <AlertDialogHeader fontSize="lg" fontWeight="bold" color="red.600">
+              Confirm Deletion
             </AlertDialogHeader>
 
             <AlertDialogBody>
-              Are you sure you want to permanently delete the document for{' '}
-              <strong>{clientName}</strong>? This action cannot be undone.
+              Are you sure you want to delete this document for <strong>{clientName}</strong>? 
+              <br /><br />
+              This action creates a permanent record gap and cannot be undone.
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose} isDisabled={isPending}>
+              <Button ref={cancelRef} onClick={onClose} isDisabled={isPending} variant="ghost">
                 Cancel
               </Button>
               <Button
@@ -98,7 +96,7 @@ export function DeleteButton({ quoteId, clientName, isDisabled }: DeleteButtonPr
                 ml={3}
                 isLoading={isPending}
               >
-                Delete
+                Delete Permanently
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -5,8 +5,7 @@ import {
 } from '@chakra-ui/react';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useRef, useState, useActionState } from 'react'; // 🟢 FIX: Switched to useActionState
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Tables } from '@/types/supabase';
 // 🟢 IMPORT NEW ACTION & COMPONENT
@@ -88,11 +87,13 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
 
   // --- LOGO STATE ---
   const initialLogoState = { success: false, message: '' };
-  const [logoState, logoFormAction] = useFormState(uploadLogoAction, initialLogoState);
+  // 🟢 FIX: useActionState instead of useFormState
+  const [logoState, logoFormAction] = useActionState(uploadLogoAction, initialLogoState);
 
   // --- 🟢 NEW: SIGNATURE STATE ---
   const initialSigState = { success: false, message: '' };
-  const [sigState, sigFormAction] = useFormState(uploadSignatureAction, initialSigState);
+  // 🟢 FIX: useActionState instead of useFormState
+  const [sigState, sigFormAction] = useActionState(uploadSignatureAction, initialSigState);
 
   // Toast Logic for Uploads
   useEffect(() => {
@@ -187,7 +188,8 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
           
           {/* Left Column: Form Data */}
           <GridItem as="form" onSubmit={handleDetailsSubmit}>
-            <SettingsSection title="Company Profile" icon={Building}>
+            {/* 🟢 UPDATED: "Business Identity" */}
+            <SettingsSection title="Business Identity" icon={Building}>
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                 <FormControl isRequired gridColumn={{ md: 'span 2' }}>
                   <FormLabel>Company Name</FormLabel>
@@ -197,10 +199,24 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
                 <FormControl isRequired>
                   <FormLabel>Billing Currency</FormLabel>
                   <Select focusBorderColor={focusBorderColor} value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                    <option value="ZAR">ZAR (R)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
+                    <optgroup label="Popular">
+                        <option value="ZAR">ZAR (South African Rand)</option>
+                        <option value="USD">USD (US Dollar)</option>
+                        <option value="EUR">EUR (Euro)</option>
+                        <option value="GBP">GBP (British Pound)</option>
+                    </optgroup>
+                    <optgroup label="African Currencies">
+                        <option value="NGN">NGN (Nigerian Naira)</option>
+                        <option value="KES">KES (Kenyan Shilling)</option>
+                        <option value="GHS">GHS (Ghanaian Cedi)</option>
+                        <option value="UGX">UGX (Ugandan Shilling)</option>
+                        <option value="TZS">TZS (Tanzanian Shilling)</option>
+                        <option value="RWF">RWF (Rwandan Franc)</option>
+                        <option value="BWP">BWP (Botswana Pula)</option>
+                        <option value="NAD">NAD (Namibian Dollar)</option>
+                        <option value="ZMW">ZMW (Zambian Kwacha)</option>
+                        <option value="EGP">EGP (Egyptian Pound)</option>
+                    </optgroup>
                   </Select>
                 </FormControl>
 
@@ -225,7 +241,8 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
           {/* Right Column: Uploaders */}
           <GridItem>
             <VStack spacing={8} align="stretch" h="full">
-              <SettingsSection title="Branding (Logo)" icon={UploadCloud}>
+              {/* 🟢 UPDATED: "Brand Assets" */}
+              <SettingsSection title="Brand Assets" icon={UploadCloud}>
                  <LogoUploader profile={profile} formAction={logoFormAction} state={logoState} />
               </SettingsSection>
               
@@ -241,7 +258,8 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
         <Box as="form" onSubmit={handleDetailsSubmit}>
           <VStack spacing={8} align="stretch">
             
-            <SettingsSection title="Online Payment Links" icon={LinkIcon}>
+            {/* 🟢 UPDATED: "Payment Gateways" */}
+            <SettingsSection title="Payment Gateways" icon={LinkIcon}>
               <Box>
                 <Badge colorScheme="cyan" mb={4}>Smart Feature</Badge>
                 <Box color="gray.500" fontSize="sm" mb={6}>
