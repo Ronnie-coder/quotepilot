@@ -5,10 +5,11 @@ import {
 } from '@chakra-ui/react';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState, useActionState } from 'react'; // 🟢 FIX: Switched to useActionState
+import { useEffect, useRef, useState, useActionState } from 'react'; 
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { Tables } from '@/types/supabase';
-// 🟢 IMPORT NEW ACTION & COMPONENT
+// 🟢 FIX: Import Database directly instead of the missing 'Tables' helper
+import { Database } from '@/types/supabase';
+
 import { uploadLogoAction, uploadSignatureAction } from './actions';
 import LogoUploader from '@/components/LogoUploader';
 import SignatureUploader from '@/components/SignatureUploader'; 
@@ -17,7 +18,10 @@ import { Building, Banknote, FileText, UploadCloud, Save, Link as LinkIcon, Chec
 import { motion } from 'framer-motion';
 import { PaymentSettings, PaymentProviderType } from '@/types/profile';
 
-type ProfileWithBanking = Tables<'profiles'> & {
+// 🟢 FIX: Manually derive the Profile Row type
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+
+type ProfileWithBanking = ProfileRow & {
   bank_name?: string | null;
   account_holder?: string | null;
   account_number?: string | null;
@@ -26,7 +30,7 @@ type ProfileWithBanking = Tables<'profiles'> & {
   branch_name?: string | null;
   currency?: string | null;
   payment_settings?: PaymentSettings | null; 
-  signature_url?: string | null; // 🟢 Added Type
+  signature_url?: string | null; 
 };
 
 type SettingsFormProps = {
@@ -34,7 +38,6 @@ type SettingsFormProps = {
   profile: ProfileWithBanking | null;
 };
 
-// ... (Variants Constants stay same) ...
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
@@ -44,7 +47,6 @@ const itemVariants = {
   visible: { y: 0, opacity: 1, transition: { duration: 0.5, ease: 'easeOut' } },
 };
 
-// ... (SettingsSection Component stays same) ...
 const SettingsSection = ({ title, icon, children }: { title: string, icon: React.ElementType, children: React.ReactNode }) => {
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -82,17 +84,14 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const toast = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const toastShownRef = useRef(false);
   const focusBorderColor = useColorModeValue('cyan.500', 'cyan.300');
 
   // --- LOGO STATE ---
   const initialLogoState = { success: false, message: '' };
-  // 🟢 FIX: useActionState instead of useFormState
   const [logoState, logoFormAction] = useActionState(uploadLogoAction, initialLogoState);
 
-  // --- 🟢 NEW: SIGNATURE STATE ---
+  // --- SIGNATURE STATE ---
   const initialSigState = { success: false, message: '' };
-  // 🟢 FIX: useActionState instead of useFormState
   const [sigState, sigFormAction] = useActionState(uploadSignatureAction, initialSigState);
 
   // Toast Logic for Uploads
@@ -110,8 +109,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     }
   }, [sigState, toast, router]);
   
-  // (Onboarding Toast Logic remains same...)
-
   // Form Field States
   const [companyName, setCompanyName] = useState(profile?.company_name || '');
   const [companyAddress, setCompanyAddress] = useState(profile?.company_address || '');
@@ -188,7 +185,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
           
           {/* Left Column: Form Data */}
           <GridItem as="form" onSubmit={handleDetailsSubmit}>
-            {/* 🟢 UPDATED: "Business Identity" */}
             <SettingsSection title="Business Identity" icon={Building}>
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                 <FormControl isRequired gridColumn={{ md: 'span 2' }}>
@@ -241,12 +237,10 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
           {/* Right Column: Uploaders */}
           <GridItem>
             <VStack spacing={8} align="stretch" h="full">
-              {/* 🟢 UPDATED: "Brand Assets" */}
               <SettingsSection title="Brand Assets" icon={UploadCloud}>
                  <LogoUploader profile={profile} formAction={logoFormAction} state={logoState} />
               </SettingsSection>
               
-              {/* 🟢 NEW: SIGNATURE SECTION */}
               <SettingsSection title="Digital Signature" icon={PenTool}>
                  <SignatureUploader profile={profile} formAction={sigFormAction} state={sigState} />
               </SettingsSection>
@@ -258,7 +252,6 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
         <Box as="form" onSubmit={handleDetailsSubmit}>
           <VStack spacing={8} align="stretch">
             
-            {/* 🟢 UPDATED: "Payment Gateways" */}
             <SettingsSection title="Payment Gateways" icon={LinkIcon}>
               <Box>
                 <Badge colorScheme="cyan" mb={4}>Smart Feature</Badge>
