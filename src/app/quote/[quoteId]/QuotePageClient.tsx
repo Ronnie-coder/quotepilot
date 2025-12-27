@@ -7,18 +7,24 @@ import ShareInvoice from '@/components/ShareInvoice';
 import InvoiceReminder from '@/components/InvoiceReminder';
 import NextLink from 'next/link';
 import { FilePenLine, ArrowLeft } from 'lucide-react';
-import { Tables } from '@/types/supabase';
+// 🟢 FIX: Import Database type directly
+import { Database } from '@/types/supabase';
 
-type ExtendedQuote = Tables<'quotes'> & {
-  clients: Tables<'clients'> | null;
+// 🟢 FIX: Manually define Row types
+type QuoteRow = Database['public']['Tables']['quotes']['Row'];
+type ClientRow = Database['public']['Tables']['clients']['Row'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+
+type ExtendedQuote = QuoteRow & {
+  clients: ClientRow | null;
   currency?: string;
   payment_link?: string | null;
 };
 
 type QuotePageClientProps = {
   quote: ExtendedQuote;
-  profile: Tables<'profiles'> | null;
-  clients: Tables<'clients'>[];
+  profile: ProfileRow | null;
+  clients: ClientRow[];
   isViewing: boolean;
 };
 
