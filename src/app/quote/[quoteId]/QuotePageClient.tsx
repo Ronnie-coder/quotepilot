@@ -60,7 +60,7 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
                   invoiceNumber={quote.invoice_number || ""}
                   clientName={quote.clients?.name || "Client"}
                   amount={formatAmount(quote.total, quote.currency)}
-                  dueDate={quote.due_date}
+                  dueDate={quote.due_date || ""}
                   clientEmail={quote.clients?.email}
                />
                
