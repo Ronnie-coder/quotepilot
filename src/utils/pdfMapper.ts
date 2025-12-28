@@ -40,26 +40,29 @@ export const mapToPdfPayload = (
     documentType: quote.document_type || 'Invoice',
     invoiceNumber: quote.invoice_number,
     invoiceDate: quote.invoice_date || quote.created_at,
-    dueDate: quote.due_date,
+    dueDate: quote.due_date ?? null, // 🟢 FIX: Handle undefined
     currency: quote.currency || 'USD',
     brandColor: quote.brand_color || '#319795',
     
     from: {
-      name: profile.company_name,
-      address: profile.company_address,
+      // 🟢 FIX: Ensure undefined becomes null for type safety
+      name: profile.company_name ?? null,
+      address: profile.company_address ?? null,
       email: userEmail, // Uses passed email (Auth or Profile)
-      phone: profile.company_phone
+      phone: profile.company_phone ?? null
     },
 
     to: {
-      name: client.name,
-      address: client.address,
-      email: client.email,
-      phone: client.phone
+      // 🟢 FIX: Ensure undefined becomes null for type safety
+      name: client.name ?? null,
+      address: client.address ?? null,
+      email: client.email ?? null,
+      phone: client.phone ?? null
     },
 
-    logo: profile.logo_url,
-    signature: profileWithSig.signature_url,
+    // 🟢 FIX: Ensure undefined becomes null for type safety
+    logo: profile.logo_url ?? null,
+    signature: profileWithSig.signature_url ?? null,
     paymentLink: resolvePaymentLink(quote, profile),
 
     lineItems: lineItems.map((item: any) => ({
@@ -76,11 +79,12 @@ export const mapToPdfPayload = (
     total: total,
 
     payment: {
-      bankName: profileWithSig.bank_name, 
-      accountHolder: profileWithSig.account_holder,
-      accNumber: profileWithSig.account_number,
-      branchCode: profileWithSig.branch_code,
-      accountType: profileWithSig.account_type,
+      // 🟢 FIX: Ensure undefined becomes null for type safety
+      bankName: profileWithSig.bank_name ?? null, 
+      accountHolder: profileWithSig.account_holder ?? null,
+      accNumber: profileWithSig.account_number ?? null,
+      branchCode: profileWithSig.branch_code ?? null,
+      accountType: profileWithSig.account_type ?? null,
     }
   };
 };
