@@ -1,12 +1,14 @@
-// src/components/LogoUploader.tsx
-
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Box, Image, Text, VStack, Icon, Center, useColorModeValue, Spinner, Button, HStack, FormControl, FormLabel } from '@chakra-ui/react';
 import { UploadCloud, CheckCircle, AlertTriangle, Trash2 } from 'lucide-react';
-import { Tables } from '@/types/supabase';
+// 🟢 FIX: Import Database type directly
+import { Database } from '@/types/supabase';
+
+// 🟢 FIX: Local type helper for Tables
+type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 
 interface LogoUploaderProps {
   profile: Tables<'profiles'> | null;
