@@ -27,13 +27,17 @@ import {
   InputLeftElement,
 } from '@chakra-ui/react';
 import { Trash2, Plus, Save, Download } from 'lucide-react';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // 🟢 Added for fetching email
-import { Tables } from '@/types/supabase';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'; 
+// 🟢 FIX: Import Database directly instead of non-existent Tables helper
+import { Database } from '@/types/supabase';
 import { PaymentSettings } from '@/types/profile'; 
 import { InvoiceFormData } from '@/types/invoice';
 import { createQuoteAction, updateQuoteAction } from '@/app/dashboard/quotes/actions';
 import { generatePdf } from '@/utils/pdfGenerator'; 
 import PaymentMethodSelector from './PaymentMethodSelector';
+
+// 🟢 FIX: Local type helper to replace the missing export
+type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 
 // Extended Types
 type ExtendedClient = Tables<'clients'> & { 
