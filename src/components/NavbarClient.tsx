@@ -49,7 +49,11 @@ import { motion, isValidMotionProp } from 'framer-motion';
 import { SupportModal } from './SupportModal';
 import { CommandPalette } from './CommandPalette';
 import { useEffect, useState } from 'react';
-import { Tables } from '@/types/supabase'; 
+// 🟢 FIX: Import Database directly
+import { Database } from '@/types/supabase';
+
+// 🟢 FIX: Local type helper for Tables
+type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 
 // --- ICON MAPPING (DB String -> Component) ---
 const ICON_MAP: Record<string, any> = {
