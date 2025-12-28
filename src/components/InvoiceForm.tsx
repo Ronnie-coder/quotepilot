@@ -215,16 +215,17 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       // 🟢 FIX: Find selected client to get their PHONE number
       const selectedClient = clients.find(c => c.name === formData.to.name);
       
+      // 🟢 FIX: Use null coalescing to satisfy 'string | null' type requirement
       const safeProfile = {
-        logo: profile?.logo_url || undefined,
-        name: profile?.company_name || undefined,
-        email: senderEmail || undefined, // 🟢 FIX: Use fetched sender email
-        address: profile?.company_address || undefined,
-        phone: profile?.company_phone || undefined, // 🟢 FIX: Pass company phone
-        bankName: profile?.bank_name || undefined,
-        accountHolder: profile?.account_holder || undefined,
-        accNumber: profile?.account_number || undefined,
-        branchCode: profile?.branch_code || undefined
+        logo: profile?.logo_url ?? null,
+        name: profile?.company_name ?? null,
+        email: senderEmail || null, 
+        address: profile?.company_address ?? null,
+        phone: profile?.company_phone ?? null, 
+        bankName: profile?.bank_name ?? null,
+        accountHolder: profile?.account_holder ?? null,
+        accNumber: profile?.account_number ?? null,
+        branchCode: profile?.branch_code ?? null
       };
 
       const blob = await generatePdf({
@@ -242,11 +243,12 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
           name: safeProfile.name,
           email: safeProfile.email,
           address: safeProfile.address,
-          phone: safeProfile.phone, // 🟢 Pass to Generator
+          phone: safeProfile.phone, 
         },
         to: {
             ...formData.to,
-            phone: selectedClient?.phone || undefined, // 🟢 Pass Client Phone
+            // 🟢 FIX: Use null instead of undefined for missing phone
+            phone: selectedClient?.phone ?? null,
         },
         lineItems: formData.lineItems.map(item => ({
             description: item.description,
