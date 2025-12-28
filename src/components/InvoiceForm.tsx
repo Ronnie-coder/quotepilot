@@ -229,10 +229,11 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
 
       const blob = await generatePdf({
         documentType,
-        brandColor: formData.brandColor,
-        invoiceNumber: formData.invoiceNumber,
-        invoiceDate: formData.invoiceDate,
-        dueDate: formData.dueDate,
+        // 🟢 FIX: Provide fallback strings for mandatory fields
+        brandColor: formData.brandColor || '#319795',
+        invoiceNumber: formData.invoiceNumber || '',
+        invoiceDate: formData.invoiceDate || '',
+        dueDate: formData.dueDate || '',
         logo: safeProfile.logo,
         signature: profile?.signature_url || undefined, 
         currency: activeCurrency, 
