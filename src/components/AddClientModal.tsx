@@ -54,10 +54,10 @@ export default function AddClientModal({ isOpen, onClose, user, onClientAdded }:
       user_id: user.id,
     };
 
-    // @ts-ignore: Bypassing TS check since columns are being added manually to DB
+    // 🟢 FIX: Cast payload to any because Supabase types are out of sync (expecting 'never')
     const { data, error } = await supabase
       .from('clients')
-      .insert(payload) 
+      .insert(payload as any) 
       .select()
       .single();
 
