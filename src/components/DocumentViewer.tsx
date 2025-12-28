@@ -1,16 +1,22 @@
 'use client';
 
-import { Tables } from '@/types/supabase';
+// 🟢 FIX: Import Database instead of non-existent Tables helper
+import { Database } from '@/types/supabase';
 import { Box, Heading, Text, VStack, HStack, Divider, SimpleGrid, useColorModeValue, Tag } from '@chakra-ui/react';
+
+// 🟢 FIX: Define Row types manually from Database definition
+type QuoteRow = Database['public']['Tables']['quotes']['Row'];
+type ClientRow = Database['public']['Tables']['clients']['Row'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
 // --- THE FIX: Extended Type Definition ---
 // We manually add 'status' to the type because Supabase types might lag behind or handle enums differently.
 type DocumentViewerProps = {
-  quote: Tables<'quotes'> & { 
-    clients: Tables<'clients'> | null;
+  quote: QuoteRow & { 
+    clients: ClientRow | null;
     status: string | null; // Explicitly adding status here
   };
-  profile: Tables<'profiles'> | null;
+  profile: ProfileRow | null;
 };
 
 // --- Reusable Sub-Components for Clean Layout ---
