@@ -33,19 +33,32 @@ const formatDate = (dateStr?: string | null) => {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+// 🟢 FIXED: Handles both Server (Email) and Client (Browser) environments
 const getBase64FromUrl = async (url: string): Promise<string | null> => {
   try {
     const cleanUrl = `${url}?t=${new Date().getTime()}`; 
     const response = await fetch(cleanUrl);
     if (!response.ok) return null;
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
+
+    // CHECK: Are we on the server?
+    if (typeof window === 'undefined') {
+      // 🟢 SERVER SIDE (Node.js) - Use Buffer
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const contentType = response.headers.get("content-type") || "image/png";
+      return `data:${contentType};base64,${buffer.toString("base64")}`;
+    } else {
+      // 🟢 CLIENT SIDE (Browser) - Use FileReader
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    }
   } catch (error) {
+    console.error("Error generating Base64 for PDF:", error);
     return null;
   }
 };

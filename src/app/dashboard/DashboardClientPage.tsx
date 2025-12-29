@@ -24,6 +24,7 @@ import {
   PieChart, Pie, Cell, Legend 
 } from 'recharts';
 
+// --- TYPES ---
 type OverdueInvoice = {
   id: string;
   invoice_number: string;
@@ -35,13 +36,23 @@ type OverdueInvoice = {
 
 type StatusMetric = { name: string; value: number };
 
+type RecentDoc = {
+  id: string;
+  invoice_number: string;
+  total: number;
+  status: string;
+  document_type: string;
+  currency?: string;
+  clients: { name: string } | null;
+};
+
 type DashboardClientPageProps = {
   user: User;
   clientCount: number;
   quoteCount: number;
   totalRevenue: number;
   outstandingRevenue: number; 
-  recentDocuments: any[];
+  recentDocuments: RecentDoc[];
   overdueInvoices: OverdueInvoice[];
   revenueData: { name: string; value: number }[];
   statusData: StatusMetric[];
@@ -156,7 +167,8 @@ export default function DashboardClientPage({
   const tooltipBg = useColorModeValue('#ffffff', '#2D3748');
   const tooltipBorder = useColorModeValue('#E2E8F0', '#4A5568');
   const tooltipText = useColorModeValue('#1A202C', '#F7FAFC');
-  const [brand500, green400, orange400, gray300, blue400] = useToken('colors', ['brand.500', 'green.400', 'orange.400', 'gray.300', 'blue.400']);
+  const [brand500] = useToken('colors', ['brand.500']);
+  const [green400, orange400, gray300, blue400] = useToken('colors', ['green.400', 'orange.400', 'gray.300', 'blue.400']);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const router = useRouter();
@@ -234,7 +246,7 @@ export default function DashboardClientPage({
             {/* Charts Section */}
             <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={8} as={motion.div} variants={itemVariants}>
               
-              {/* Revenue Chart with FIX */}
+              {/* Revenue Chart */}
               <Box gridColumn={{ lg: 'span 2' }} bg={cardBg} p={6} borderRadius="xl" borderWidth="1px" borderColor={borderColor} shadow="sm" position="relative" minWidth={0}>
                 <Flex justify="space-between" align="center" mb={6}>
                     <HStack>
@@ -256,7 +268,6 @@ export default function DashboardClientPage({
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={borderColor === 'gray.700' ? '#2D3748' : '#E2E8F0'} />
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: textColor === 'gray.400' ? '#A0AEC0' : '#718096', fontSize: 12 }} dy={10} />
                         <YAxis hide />
-                        {/* 🟢 FIX: Updated formatter type to satisfy Recharts strict typing */}
                         <Tooltip 
                             contentStyle={{ backgroundColor: tooltipBg, borderRadius: '8px', border: `1px solid ${tooltipBorder}`, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
                             labelStyle={{ color: headingColor, fontWeight: 'bold' }} 
@@ -273,7 +284,7 @@ export default function DashboardClientPage({
                 </Box>
               </Box>
 
-              {/* Pie Chart with FIX */}
+              {/* Pie Chart */}
               <Flex direction="column" bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={borderColor} shadow="sm" p={6} h="full" minH="400px" minWidth={0}>
                 <HStack mb={4}><Icon as={PieChartIcon} color="orange.400" boxSize={5} /><Heading size="md" color={headingColor}>Invoice Health</Heading></HStack>
                 <Box h="300px" w="100%" position="relative">
@@ -307,22 +318,37 @@ export default function DashboardClientPage({
                 <Divider color={borderColor} />
                 <VStack spacing={0} align="stretch">
                   {recentDocuments && recentDocuments.length > 0 ? (
-                    recentDocuments.map((doc, index) => (
-                      <ChakraLink as={NextLink} href={`/quote/${doc.id}`} key={doc.id} _hover={{ textDecoration: 'none', bg: linkHoverBg }} p={4} borderBottomWidth={index === recentDocuments.length - 1 ? '0px' : '1px'} borderColor={borderColor} transition="all 0.2s">
-                        <HStack justify="space-between">
-                          <HStack spacing={3}>
-                            <Box p={2} borderRadius="md" bg={doc.document_type === 'Invoice' ? 'green.100' : 'purple.100'} color={doc.document_type === 'Invoice' ? 'green.600' : 'purple.600'}>
-                              <Icon as={doc.document_type === 'Invoice' ? DollarSign : FileText} boxSize={4} />
-                            </Box>
-                            <VStack align="start" spacing={0}>
-                              <Text fontWeight="bold" fontSize="sm" color={headingColor}>{doc.clients?.name || 'Unknown Client'}</Text>
-                              <Text fontSize="xs" color={textColor}>#{doc.invoice_number || 'DRAFT'}</Text>
-                            </VStack>
+                    recentDocuments.map((doc, index) => {
+                      // RULES IMPLEMENTED:
+                      // 1. Quote -> FileText
+                      // 2. Paid Invoice -> DollarSign
+                      // 3. Draft/Sent Invoice -> FileText
+                      
+                      const isInvoice = doc.document_type?.toLowerCase() === 'invoice';
+                      const isPaid = doc.status?.toLowerCase() === 'paid';
+                      const showMoneyIcon = isInvoice && isPaid;
+
+                      const IconComp = showMoneyIcon ? DollarSign : FileText;
+                      const iconBgColor = showMoneyIcon ? 'green.100' : 'gray.100';
+                      const iconColor = showMoneyIcon ? 'green.600' : 'gray.600';
+
+                      return (
+                        <ChakraLink as={NextLink} href={`/quote/${doc.id}`} key={doc.id} _hover={{ textDecoration: 'none', bg: linkHoverBg }} p={4} borderBottomWidth={index === recentDocuments.length - 1 ? '0px' : '1px'} borderColor={borderColor} transition="all 0.2s">
+                          <HStack justify="space-between">
+                            <HStack spacing={3}>
+                              <Box p={2} borderRadius="md" bg={iconBgColor} color={iconColor}>
+                                <Icon as={IconComp} boxSize={4} />
+                              </Box>
+                              <VStack align="start" spacing={0}>
+                                <Text fontWeight="bold" fontSize="sm" color={headingColor}>{doc.clients?.name || 'Unknown Client'}</Text>
+                                <Text fontSize="xs" color={textColor}>#{doc.invoice_number || 'DRAFT'}</Text>
+                              </VStack>
+                            </HStack>
+                            <Text fontWeight="bold" fontSize="sm" color={headingColor} fontFamily="mono">{formatCurrency(doc.total || 0, doc.currency || currency)}</Text>
                           </HStack>
-                          <Text fontWeight="bold" fontSize="sm" color={headingColor} fontFamily="mono">{formatCurrency(doc.total || 0, doc.currency || currency)}</Text>
-                        </HStack>
-                      </ChakraLink>
-                    ))
+                        </ChakraLink>
+                      );
+                    })
                   ) : (
                     <Flex direction="column" align="center" justify="center" p={10}>
                       <Icon as={Inbox} boxSize={10} color={textColor} opacity={0.5} mb={3} /><Text color={textColor} fontSize="sm">No recent activity.</Text>

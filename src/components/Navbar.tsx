@@ -2,15 +2,14 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import NavbarClient from './NavbarClient';
 
 export default async function Navbar() {
-  // 🟢 FIX: Added await here
   const supabase = await createSupabaseServerClient();
   
-  // 2. Fetch the current user
+  // 1. Fetch the current user
   const { data: { user } } = await supabase.auth.getUser();
 
   let profile = null;
 
-  // 3. If user exists, fetch their profile (to get the logo)
+  // 2. If user exists, fetch their profile
   if (user) {
     const { data } = await supabase
       .from('profiles')
@@ -20,6 +19,6 @@ export default async function Navbar() {
     profile = data;
   }
 
-  // 4. Pass both user and profile to Client Component
+  // 3. Pass data to Client Component
   return <NavbarClient user={user} profile={profile} />;
 }

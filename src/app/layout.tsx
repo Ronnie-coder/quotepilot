@@ -8,7 +8,7 @@ import AuthListener from '@/components/AuthListener';
 import BackToTop from '@/components/BackToTop';
 import { Inter } from 'next/font/google';
 
-// 🟢 FIX: Load the font so the theme can use it
+// Load the font so the theme can use it
 const inter = Inter({ subsets: ['latin'] });
 
 const siteUrl = 'https://quotepilot.coderon.co.za/';
@@ -36,12 +36,11 @@ export const metadata: Metadata = {
   icons: { icon: '/logo.svg', shortcut: '/logo.svg', apple: '/logo.svg' },
 };
 
-// 🟢 FIX: Correct TypeScript type for children
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" style={{ scrollBehavior: 'smooth' }}>
-      <body className={inter.className}>
-        {/* 🟢 FIX: This script prevents the color mode flash on reload */}
+    <html lang="en" style={{ scrollBehavior: 'smooth' }} suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
+        {/* This script prevents the color mode flash on reload */}
         <ColorModeScript initialColorMode="light" />
         
         <Providers>

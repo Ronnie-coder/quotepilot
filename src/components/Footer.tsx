@@ -29,7 +29,7 @@ import {
 import { keyframes } from '@emotion/react'; 
 import NextLink from 'next/link';
 import { FaGithub, FaLinkedin, FaTwitter } from 'react-icons/fa';
-import { CheckCircle, Server, Shield, Activity, Globe } from 'lucide-react';
+import { CheckCircle, Server, Shield, Globe, Mail } from 'lucide-react';
 import { motion, isValidMotionProp } from 'framer-motion';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
@@ -80,7 +80,6 @@ const Footer = () => {
   const [currentTime, setCurrentTime] = useState<string | null>(null);
   
   useEffect(() => {
-    // Only set time on client to avoid hydration mismatch
     const updateTime = () => {
       setCurrentTime(new Date().toLocaleTimeString('en-ZA', { timeZone: 'Africa/Johannesburg', hour: '2-digit', minute: '2-digit' }));
     };
@@ -95,7 +94,8 @@ const Footer = () => {
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(72, 187, 120, 0); }
   `;
 
-  const appVersion = "v3.2.1-stable";
+  // 🟢 BUMPED VERSION
+  const appVersion = "v3.2.2-stable";
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -202,7 +202,7 @@ const Footer = () => {
               />
             </HStack>
 
-            {/* System Status - 🟢 UPGRADED: CLICKABLE DIAGNOSTIC */}
+            {/* System Status */}
             <VStack spacing={1} align={{ base: 'center', md: 'flex-end' }}>
                 <Text fontSize="xs" color={textColor} fontFamily="mono" opacity={0.7}>{appVersion}</Text>
                 {currentTime && (
@@ -241,6 +241,14 @@ const Footer = () => {
                       </PopoverHeader>
                       <PopoverBody p={0}>
                          <List spacing={0}>
+                           <ListItem display="flex" alignItems="center" px={3} py={2} borderBottomWidth="1px" borderColor={borderColor}>
+                              <ListIcon as={Mail} color="green.500" boxSize={4} />
+                              <Flex direction="column" ml={2}>
+                                <Text fontSize="xs" fontWeight="bold">Email Relay</Text>
+                                <Text fontSize="10px" color="gray.500">Operational via Resend</Text>
+                              </Flex>
+                           </ListItem>
+                           
                            <ListItem display="flex" alignItems="center" px={3} py={2} borderBottomWidth="1px" borderColor={borderColor}>
                               <ListIcon as={Server} color="green.500" boxSize={4} />
                               <Flex direction="column" ml={2}>

@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import DashboardClientPage from './DashboardClientPage';
 
 export default async function DashboardPage() {
-  // 🟢 FIX: Added await here
   const supabase = await createSupabaseServerClient();
   
   const { data: { user } } = await supabase.auth.getUser();
@@ -19,6 +18,7 @@ export default async function DashboardPage() {
   const { count: clientCount } = await supabase.from('clients').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
 
   // 3. FETCH ALL DOCUMENTS
+  // We fetch everything to perform strict filtering in memory
   const { data: allDocs, error } = await supabase
     .from('quotes')
     .select('id, invoice_number, total, status, document_type, currency, created_at, due_date, client_id, clients(name)')
@@ -30,17 +30,29 @@ export default async function DashboardPage() {
   const safeDocs = allDocs || [];
   const quoteCount = safeDocs.length;
 
-  // --- HELPER: Case-Insensitive Status Check ---
+  // --- BUSINESS LOGIC HELPERS ---
+  // STRICT: Quotes NEVER count as revenue. Only 'invoice' type counts.
+  const isInvoice = (doc: any) => doc.document_type?.toLowerCase() === 'invoice';
+  
+  // STRICT: Only 'paid' status counts as realized revenue.
   const isPaid = (status: string) => status?.toLowerCase() === 'paid';
-  const isDraft = (status: string) => status?.toLowerCase() === 'draft';
+  
+  // STRICT: Outstanding = Sent (or Overdue) Invoices. Never Drafts or Quotes.
+  const isOutstanding = (status: string) => {
+    const s = status?.toLowerCase();
+    return s === 'sent' || s === 'overdue';
+  };
 
   // 4. Calculate Financials
+  
+  // RULE 1: Total Revenue = Sum of PAID INVOICES only.
   const totalRevenue = safeDocs
-    .filter(d => isPaid(d.status))
+    .filter(d => isInvoice(d) && isPaid(d.status))
     .reduce((acc, curr) => acc + (curr.total || 0), 0);
 
+  // RULE 2: Outstanding Revenue = Sum of SENT/OVERDUE INVOICES only.
   const outstandingRevenue = safeDocs
-    .filter(d => !isPaid(d.status) && !isDraft(d.status)) 
+    .filter(d => isInvoice(d) && isOutstanding(d.status)) 
     .reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   // 5. Prepare Lists
@@ -50,15 +62,18 @@ export default async function DashboardPage() {
     return clientData?.name || 'Unknown';
   };
 
+  // Recent Documents (Includes Quotes for visibility, UI handles icons)
   const recentDocuments = safeDocs.slice(0, 5).map((doc) => ({
     ...doc,
     clients: { name: getClientName(doc.clients) }
   }));
 
+  // Overdue Invoices (Strictly Invoices, strictly Overdue)
   const overdueInvoices = safeDocs
     .filter(doc => {
         const isOverdue = doc.due_date && new Date(doc.due_date) < new Date();
-        return isOverdue && !isPaid(doc.status) && !isDraft(doc.status);
+        // Ensure we only count Invoices as overdue, not Quotes
+        return isInvoice(doc) && isOverdue && !isPaid(doc.status) && doc.status?.toLowerCase() !== 'draft';
     })
     .slice(0, 10)
     .map((inv) => ({
@@ -66,7 +81,8 @@ export default async function DashboardPage() {
       clients: { name: getClientName(inv.clients) }
     }));
 
-  // 6. Chart Data
+  // 6. Chart Data (Revenue Velocity)
+  // Only include PAID INVOICES in the revenue chart
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const revenueData = new Array(6).fill(0).map((_, i) => {
     const d = new Date();
@@ -74,18 +90,20 @@ export default async function DashboardPage() {
     return { name: months[d.getMonth()], value: 0, sortDate: d.toISOString().slice(0, 7) };
   });
 
-  safeDocs.filter(d => isPaid(d.status)).forEach((inv) => {
+  safeDocs.filter(d => isInvoice(d) && isPaid(d.status)).forEach((inv) => {
     const dateStr = inv.created_at.slice(0, 7);
     const point = revenueData.find(d => d.sortDate === dateStr);
     if (point) point.value += inv.total;
   });
 
-  // 7. Status Data (USED FOR CHECKLIST LOGIC)
+  // 7. Status Data (Invoice Health Pie Chart)
+  // Only include INVOICES. Quotes should not skew "Paid %" or "Overdue %".
   const statusCounts = { Paid: 0, Overdue: 0, Sent: 0, Draft: 0 };
   const now = new Date();
 
-  safeDocs.forEach((doc) => {
+  safeDocs.filter(isInvoice).forEach((doc) => {
     let s = doc.status ? doc.status.toLowerCase() : 'draft';
+    
     if (s === 'paid') statusCounts.Paid++;
     else if (s === 'draft') statusCounts.Draft++;
     else if (doc.due_date && new Date(doc.due_date) < now) statusCounts.Overdue++;

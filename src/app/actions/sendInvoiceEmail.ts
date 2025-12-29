@@ -8,10 +8,15 @@ import { mapToPdfPayload } from "@/utils/pdfMapper";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendInvoiceEmail(quoteId: string) {
+  // Validate Environment
+  if (!process.env.RESEND_API_KEY) {
+    console.error("❌ RESEND_API_KEY is missing from environment variables.");
+    return { success: false, message: "Server configuration error: Missing API Key." };
+  }
+
   const supabase = createSupabaseAdminClient();
 
-  // 1. Fetch Quote Data with COMPLETE Relations ( * )
-  // 🟢 FIX: We now select ALL fields from clients and profiles
+  // 1. Fetch Quote Data with COMPLETE Relations
   const { data: quote, error: dbError } = await supabase
     .from("quotes")
     .select(`
@@ -31,7 +36,9 @@ export async function sendInvoiceEmail(quoteId: string) {
   const client = Array.isArray(quote.clients) ? quote.clients[0] : quote.clients;
   const profile = Array.isArray(quote.profiles) ? quote.profiles[0] : quote.profiles;
 
+  // Validate Recipient
   if (!client?.email) {
+    console.warn(`⚠️ Client missing email for Quote ID: ${quoteId}`);
     return { success: false, message: "Client has no email address." };
   }
 
@@ -42,10 +49,13 @@ export async function sendInvoiceEmail(quoteId: string) {
   const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const publicLink = `${origin}/p/${quoteId}`;
   const senderDisplayName = profile?.company_name || "QuotePilot User";
+  
+  // Validate Sender
+  const fromEmail = 'QuotePilot <billing@coderon.co.za>';
 
   try {
-    // 🟢 4. Generate the PDF for Attachment
-    // Uses the MASTER MAPPER to ensure 100% match with client download
+    // 4. Generate the PDF for Attachment
+    console.log(`📄 Generating PDF for Quote ${quoteId}...`);
     const pdfPayload = mapToPdfPayload(quote, profile, client, freelancerEmail);
     const pdfBlob = await generatePdf(pdfPayload);
     const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer());
@@ -66,8 +76,10 @@ export async function sendInvoiceEmail(quoteId: string) {
     );
 
     // 6. Send Email with Attachment
-    const data = await resend.emails.send({
-      from: 'QuotePilot <billing@coderon.co.za>', 
+    console.log(`📧 Sending email via Resend to: ${client.email}`);
+
+    const { error: resendError } = await resend.emails.send({
+      from: fromEmail, 
       to: [client.email], 
       replyTo: freelancerEmail,
       subject: `Invoice #${quote.invoice_number} from ${senderDisplayName}`,
@@ -80,20 +92,21 @@ export async function sendInvoiceEmail(quoteId: string) {
       ],
     });
 
-    if (data.error) {
-      console.error("❌ Resend Error:", data.error);
-      return { success: false, message: "Email delivery failed." };
+    if (resendError) {
+      console.error("❌ Resend API Error:", resendError);
+      return { success: false, message: `Email delivery failed: ${resendError.message}` };
     }
 
-    // 🟢 7. Auto-update status to 'Sent' if it was draft
+    // 7. Auto-update status to 'Sent' if it was draft
     if (quote.status === 'Draft') {
+        console.log(`🔄 Updating Quote ${quoteId} status to Sent`);
         await supabase.from('quotes').update({ status: 'Sent' }).eq('id', quoteId);
     }
 
     return { success: true, message: `Email sent to ${client.email}` };
 
-  } catch (error) {
-    console.error("❌ Server Error:", error);
-    return { success: false, message: "Internal Server Error." };
+  } catch (error: any) {
+    console.error("❌ Server Action Error:", error);
+    return { success: false, message: error.message || "Internal Server Error during email processing." };
   }
 }

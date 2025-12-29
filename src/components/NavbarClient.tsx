@@ -49,13 +49,11 @@ import { motion, isValidMotionProp } from 'framer-motion';
 import { SupportModal } from './SupportModal';
 import { CommandPalette } from './CommandPalette';
 import { useEffect, useState } from 'react';
-// 🟢 FIX: Import Database directly
 import { Database } from '@/types/supabase';
 
-// 🟢 FIX: Local type helper for Tables
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 
-// --- ICON MAPPING (DB String -> Component) ---
+// --- ICON MAPPING ---
 const ICON_MAP: Record<string, any> = {
   ShieldCheck, Zap, Globe, AlertTriangle, Info, CheckCircle, Bell
 };
@@ -70,7 +68,7 @@ const TYPE_COLOR_MAP: Record<string, string> = {
 
 const TAGLINE = "Join fellow pilots across Africa 🌍";
 
-// --- MOTION COMPONENT FACTORY ---
+// --- MOTION COMPONENTS ---
 const MotionList = chakra(motion.ul, {
   shouldForwardProp: (prop) => isValidMotionProp(prop) || shouldForwardProp(prop),
 });
@@ -143,28 +141,78 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
   const { isOpen: isSupportOpen, onOpen: onSupportOpen, onClose: onSupportClose } = useDisclosure();
   const { isOpen: isCmdOpen, onOpen: onCmdOpen, onClose: onCmdClose } = useDisclosure();
 
-  // 🟢 REAL: Network & Notification Logic
   const [isOnline, setIsOnline] = useState(true);
   const [notifications, setNotifications] = useState<Tables<'system_notifications'>[]>([]);
   const [isLoadingNotifs, setIsLoadingNotifs] = useState(false);
   
-  // 1. Fetch Real Notifications
+  // 1. Fetch & Subscribe to Real Notifications
   useEffect(() => {
-    if (user) {
-      const fetchNotifs = async () => {
-        setIsLoadingNotifs(true);
-        const { data } = await supabase
-          .from('system_notifications')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false });
-        
-        if (data) setNotifications(data);
-        setIsLoadingNotifs(false);
-      };
-      fetchNotifs();
-    }
-  }, [user]);
+    if (!user) return;
+
+    // Initial Fetch
+    const fetchNotifs = async () => {
+      setIsLoadingNotifs(true);
+      const { data } = await supabase
+        .from('system_notifications')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      
+      if (data) setNotifications(data);
+      setIsLoadingNotifs(false);
+    };
+
+    fetchNotifs();
+
+    // REALTIME SUBSCRIPTION
+    const channel = supabase
+      .channel('navbar-system-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'system_notifications'
+        },
+        (payload) => {
+          // INSERT
+          if (payload.eventType === 'INSERT') {
+            const newNotif = payload.new as Tables<'system_notifications'>;
+            if (newNotif.is_active) {
+                setNotifications((prev) => [newNotif, ...prev]);
+                toast({
+                    title: newNotif.title,
+                    description: newNotif.message,
+                    status: (newNotif.type as any) || 'info',
+                    position: 'top-right',
+                    isClosable: true,
+                    duration: 6000,
+                    icon: <Bell />
+                });
+            }
+          }
+          // UPDATE
+          else if (payload.eventType === 'UPDATE') {
+            const updatedNotif = payload.new as Tables<'system_notifications'>;
+            setNotifications((prev) => {
+                if (!updatedNotif.is_active) {
+                    return prev.filter(n => n.id !== updatedNotif.id);
+                }
+                return prev.map(n => n.id === updatedNotif.id ? updatedNotif : n);
+            });
+          }
+          // DELETE
+          else if (payload.eventType === 'DELETE') {
+            setNotifications((prev) => prev.filter(n => n.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, supabase, toast]);
 
   // 2. Network Listeners
   useEffect(() => {
@@ -203,8 +251,6 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
   const searchBg = useColorModeValue('gray.100', 'whiteAlpha.200');
   const searchBorder = useColorModeValue('gray.200', 'whiteAlpha.300');
   const userAvatarFilter = useColorModeValue('none', 'invert(1) brightness(2)');
-
-  // 🟢 FIX: Define Hook OUTSIDE the loop
   const notificationHoverBg = useColorModeValue('gray.50', 'whiteAlpha.100');
 
   const handleLogout = async () => {
@@ -238,11 +284,8 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
 
   const userDisplayName = profile?.company_name || 'Commander';
   const userAvatarSrc = profile?.logo_url || '';
-
-  // Calculate unread count (Offline + DB Alerts)
   const unreadCount = (!isOnline ? 1 : 0) + notifications.length;
 
-  // 🟢 REUSABLE NOTIFICATION COMPONENT TO AVOID DUPLICATION
   const NotificationPopover = () => (
     <Popover placement='bottom-end'>
         <PopoverTrigger>
@@ -270,8 +313,6 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
             </PopoverHeader>
             <PopoverBody p={0}>
                 <VStack align="stretch" spacing={0} divider={<Divider />}>
-                    
-                    {/* 1. OFFLINE WARNING (Real) */}
                     {!isOnline && (
                       <HStack p={3} spacing={3} bg="red.50">
                           <Flex align="center" justify="center" boxSize="32px" bg="red.100" color="red.600" borderRadius="full">
@@ -284,18 +325,15 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
                       </HStack>
                     )}
 
-                    {/* 2. DB LOADING STATE */}
                     {isLoadingNotifs && (
                         <Flex p={4} justify="center"><Spinner size="sm" color="teal.500" /></Flex>
                     )}
 
-                    {/* 3. REAL NOTIFICATIONS (From DB) */}
                     {!isLoadingNotifs && notifications.length > 0 ? (
                         notifications.map((alert) => {
                             const color = TYPE_COLOR_MAP[alert.type] || 'gray';
                             const icon = ICON_MAP[alert.icon_key] || Bell;
                             return (
-                                // 🟢 FIX: Using the variable from top level
                                 <HStack key={alert.id} p={3} spacing={3} _hover={{ bg: notificationHoverBg }}>
                                     <Flex align="center" justify="center" boxSize="32px" bg={`${color}.100`} color={`${color}.600`} borderRadius="full">
                                         <Icon as={icon} size={16} />
@@ -312,7 +350,6 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
                             <Box p={4} textAlign="center"><Text fontSize="xs" color="gray.400">All systems operational.</Text></Box>
                         )
                     )}
-
                 </VStack>
             </PopoverBody>
         </PopoverContent>
@@ -393,12 +430,8 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
               </Box>
             )}
 
-            {/* DESKTOP ACTIONS */}
             <HStack spacing={3} display={{ base: 'none', md: 'flex' }}>
-              
-              {/* 🟢 NOTIFICATION CENTER (Desktop) */}
               {user && <NotificationPopover />}
-
               <IconButton onClick={onSupportOpen} variant="ghost" aria-label="Support" icon={<HelpCircle size={20} />} color="gray.500" _hover={{ color: 'teal.500', bg: 'transparent', transform: 'scale(1.1)' }} transition="all 0.2s" />
               <IconButton onClick={toggleColorMode} variant="ghost" aria-label="Toggle Theme" icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />} color="gray.500" _hover={{ color: 'teal.500', bg: 'transparent' }} />
               
@@ -418,11 +451,7 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
                         bg={userAvatarSrc ? 'transparent' : 'teal.500'} 
                         color={userAvatarSrc ? 'transparent' : 'white'}
                         icon={userAvatarSrc ? <Box /> : undefined}
-                        sx={{
-                          '& > img': {
-                            filter: userAvatarFilter
-                          }
-                        }}
+                        sx={{ '& > img': { filter: userAvatarFilter } }}
                       />
                       <Box display={{ base: 'none', lg: 'block' }} textAlign="left">
                           <Text fontSize="xs" fontWeight="bold">{userDisplayName}</Text>
@@ -444,13 +473,9 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
               )}
             </HStack>
 
-            {/* MOBILE ACTIONS */}
             <Flex display={{ md: 'none' }} gap={2}>
               {user && <IconButton onClick={onCmdOpen} variant="ghost" size="sm" aria-label="Search" icon={<Search size={18} />} />}
-              
-              {/* 🟢 NOTIFICATION CENTER (Mobile) - Added here! */}
               {user && <NotificationPopover />}
-
               <IconButton onClick={toggleColorMode} variant="ghost" size="sm" aria-label="Toggle Theme" icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />} />
               <IconButton onClick={onToggle} icon={isOpen ? <CloseIcon /> : <HamburgerIcon />} variant="ghost" aria-label="Toggle Navigation" colorScheme="teal" />
             </Flex>
