@@ -26,7 +26,6 @@ interface Quote {
     email?: string;
     phone?: string;
   };
-  // Updated to include payment_settings for link extraction
   profiles?: {
     company_name: string;
     payment_settings?: any; 
@@ -81,7 +80,6 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
     return profile?.company_name || "My Business";
   };
 
-  // 🟢 NEW: Logic to extract the specific Payment Provider URL (e.g. PayPal)
   const getActivePaymentLink = (doc: Quote) => {
     // 1. Quote specific override
     if (doc.payment_link) return doc.payment_link;
@@ -188,7 +186,8 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
           toast({ title: 'Document Deleted', status: 'success', duration: 3000 }); 
           router.refresh(); 
       } else {
-          toast({ title: 'Could not delete', description: result.message, status: 'error' });
+          // 🟢 FIX: Changed result.message to result.error to pass build
+          toast({ title: 'Could not delete', description: result.error, status: 'error' });
       }
     });
   };
@@ -336,7 +335,7 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
                               isIconOnly={true} 
                               businessName={getBusinessName(doc)}
                               type={docType}
-                              paymentLink={getActivePaymentLink(doc)} // 🟢 PASSING DIRECT LINK
+                              paymentLink={getActivePaymentLink(doc)}
                             />
                             
                             <Menu>
