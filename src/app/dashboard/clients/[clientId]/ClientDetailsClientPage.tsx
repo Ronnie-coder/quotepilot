@@ -13,10 +13,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react'; // 🟢 Added Hooks
+import { useState, useEffect } from 'react';
 import { formatCurrency } from '@/utils/formatCurrency'; 
 import ShareInvoice from '@/components/ShareInvoice'; 
-// 🟢 Import your Modal
 import EditClientModal from '@/components/EditClientModal'; 
 
 interface Props {
@@ -33,21 +32,21 @@ interface Props {
 export default function ClientDetailsClientPage({ client, documents, stats }: Props) {
   const router = useRouter();
   
-  // 🟢 1. Local State for Client Data (allows instant UI updates)
+  // Local State for Client Data (allows instant UI updates)
   const [clientData, setClientData] = useState(client);
   
-  // 🟢 2. Modal Controls
+  // Modal Controls
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  // Sync state if server prop changes (rare but good practice)
+  // Sync state if server prop changes
   useEffect(() => {
     setClientData(client);
   }, [client]);
 
-  // 🟢 3. Handle Update Success
+  // Handle Update Success
   const handleClientUpdated = (updatedClient: any) => {
-    setClientData(updatedClient); // Update UI immediately
-    router.refresh(); // Sync server data in background
+    setClientData(updatedClient); 
+    router.refresh(); 
   };
   
   // Theme
@@ -104,7 +103,6 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
             </VStack>
             <Box mt={6}>
                  <Flex justify="flex-end">
-                     {/* 🟢 4. The Real Edit Button */}
                      <Button 
                         size="sm" 
                         variant="outline" 
@@ -188,13 +186,15 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
                        </Td>
                        <Td isNumeric>{formatCurrency(doc.total, doc.currency)}</Td>
                        
-                       {/* SHARE ACTION */}
+                       {/* SHARE ACTION - UPDATED */}
                        <Td onClick={(e) => e.stopPropagation()}>
                           <ShareInvoice 
                             quoteId={doc.id}
                             invoiceNumber={doc.invoice_number}
                             clientName={clientData.name}
                             clientEmail={clientData.email}
+                            // 🟢 FIX: Dynamic business name from doc object
+                            businessName={doc.business_name || ''} 
                             isIconOnly={true}
                           />
                        </Td>
@@ -214,7 +214,7 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
         </Box>
       </SimpleGrid>
 
-      {/* 🟢 5. The Modal Component */}
+      {/* 5. The Modal Component */}
       <EditClientModal 
         isOpen={isOpen} 
         onClose={onClose} 
@@ -226,7 +226,7 @@ export default function ClientDetailsClientPage({ client, documents, stats }: Pr
   );
 }
 
-// Sub-component for Stats (Unchanged)
+// Sub-component for Stats
 const StatCard = ({ label, value, icon, color, helpText }: any) => {
     const bg = useColorModeValue('white', 'gray.800');
     return (
