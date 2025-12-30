@@ -1,4 +1,3 @@
-// FILE: src/app/dashboard/clients/DeleteClientButton.tsx (NEW FILE)
 'use client';
 
 import {

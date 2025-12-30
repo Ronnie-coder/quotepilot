@@ -28,7 +28,6 @@ import {
 } from '@chakra-ui/react';
 import { Trash2, Plus, Save, Download } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'; 
-// 🟢 FIX: Import Database directly instead of non-existent Tables helper
 import { Database } from '@/types/supabase';
 import { PaymentSettings } from '@/types/profile'; 
 import { InvoiceFormData } from '@/types/invoice';
@@ -36,7 +35,7 @@ import { createQuoteAction, updateQuoteAction } from '@/app/dashboard/quotes/act
 import { generatePdf } from '@/utils/pdfGenerator'; 
 import PaymentMethodSelector from './PaymentMethodSelector';
 
-// 🟢 FIX: Local type helper to replace the missing export
+// Local type helper
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 
 // Extended Types
@@ -60,6 +59,7 @@ type ExtendedProfile = Tables<'profiles'> & {
     company_address?: string | null;
     company_phone?: string | null; 
     terms_conditions?: string | null;
+    proposal_default_notes?: string | null; // 🟢 ADDED: New Column Support
     payment_settings?: PaymentSettings | null; 
 };
 
@@ -83,13 +83,15 @@ const FormSection = ({ title, children }: { title: string, children: React.React
 };
 
 export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProps) => {
-  const supabase = createSupabaseBrowserClient(); // 🟢 Initialize Supabase Client
-  const [documentType, setDocumentType] = useState<'Quote' | 'Invoice'>(defaultValues?.document_type === 'Invoice' ? 'Invoice' : 'Quote');
+  const supabase = createSupabaseBrowserClient();
+  
+  // Initialize State
+  const initialDocType = defaultValues?.document_type === 'Invoice' ? 'Invoice' : 'Quote';
+  const [documentType, setDocumentType] = useState<'Quote' | 'Invoice'>(initialDocType);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isNewClient, setIsNewClient] = useState(!defaultValues?.client_id && clients?.length > 0);
-  
-  // 🟢 STATE: Track Sender Email (missing in profile props)
   const [senderEmail, setSenderEmail] = useState(profile?.email || '');
 
   const [activeCurrency, setActiveCurrency] = useState((defaultValues as any)?.currency || profile?.currency || 'ZAR');
@@ -112,7 +114,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
   const watchedBrandColor = watch('brandColor');
   const watchedClientName = watch('to.name'); 
 
-  // 🟢 EFFECT: Fetch Current User Email if missing
+  // --- 1. USER EMAIL FETCH ---
   useEffect(() => {
     if (!senderEmail) {
       const getEmail = async () => {
@@ -123,7 +125,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     }
   }, [senderEmail, supabase]);
 
-  // --- DYNAMIC CURRENCY SWITCHER ---
+  // --- 2. CURRENCY SYNC ---
   useEffect(() => {
     if (isEditing && (defaultValues as any)?.currency) return;
 
@@ -139,9 +141,10 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     }
   }, [watchedClientName, isNewClient, clients, profile, isEditing, defaultValues]);
 
-  // --- INITIALIZE FORM ---
+  // --- 3. FORM INITIALIZATION ---
   useEffect(() => {
     if (defaultValues) {
+      // EDIT MODE
       const client = clients.find(c => c.id === defaultValues.client_id);
       const safeDateSource = defaultValues.invoice_date || defaultValues.created_at;
       const invoiceDate = new Date(safeDateSource || new Date()).toISOString().substring(0, 10);
@@ -153,7 +156,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         dueDate: defaultValues.due_date ? new Date(defaultValues.due_date).toISOString().substring(0, 10) : '',
         to: { name: client?.name || 'Client Not Found', email: client?.email || '', address: client?.address || '' },
         lineItems: defaultValues.line_items ? (defaultValues.line_items as any) : [{ description: '', quantity: 1, unitPrice: 0 }],
-        notes: defaultValues.notes || profile?.terms_conditions || '',
+        notes: defaultValues.notes || '', // Keep saved notes as is
         vatRate: defaultValues.vat_rate || 15,
         applyVat: (defaultValues.vat_rate || 0) > 0,
         brandColor: savedColor,
@@ -164,24 +167,47 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       if (defaultValues.payment_link) setSelectedPaymentLink(defaultValues.payment_link);
 
     } else {
+      // CREATE MODE - 🟢 SMART DEFAULT NOTES
+      // If starting as 'Quote', grab proposal defaults. If 'Invoice', grab invoice defaults.
+      const initialNotes = initialDocType === 'Quote' 
+        ? (profile?.proposal_default_notes || '') 
+        : (profile?.terms_conditions || '');
+
       reset({
         to: { name: '', address: '', email: '' },
         lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
-        notes: profile?.terms_conditions || '',
+        notes: initialNotes,
         vatRate: 15,
         applyVat: true,
         invoiceDate: new Date().toISOString().substring(0, 10),
         brandColor: '#319795',
       });
       setActiveCurrency(profile?.currency || 'ZAR');
+      
+      // Auto-select payment link only for new invoices
       if (profile?.payment_settings?.default_provider) {
         const defId = profile.payment_settings.default_provider;
         const defProvider = profile.payment_settings.providers.find(p => p.id === defId);
         if (defProvider?.url) setSelectedPaymentLink(defProvider.url);
       }
     }
-  }, [defaultValues, clients, profile, reset]);
+  }, [defaultValues, clients, profile, reset, initialDocType]);
   
+  // --- 4. HANDLE DOCUMENT TYPE TOGGLE ---
+  const handleDocTypeChange = (isInvoice: boolean) => {
+    const newType = isInvoice ? 'Invoice' : 'Quote';
+    setDocumentType(newType);
+
+    // 🟢 AUTO-SWITCH NOTES LOGIC
+    // We only swap if the field is empty OR matches the other default (prevent overwriting custom text)
+    // For simplicity in this handover, we force the swap to ensure the user sees the new terms.
+    if (newType === 'Quote') {
+        setValue('notes', profile?.proposal_default_notes || '');
+    } else {
+        setValue('notes', profile?.terms_conditions || '');
+    }
+  };
+
   const { subtotal, vatAmount, total } = useMemo(() => {
     const sub = watchedLineItems?.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0) || 0;
     const vat = applyVat ? sub * ((Number(watchedVatRate) || 0) / 100) : 0;
@@ -211,11 +237,8 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     setIsGeneratingPdf(true);
     try {
       const formData = getValues();
-      
-      // 🟢 FIX: Find selected client to get their PHONE number
       const selectedClient = clients.find(c => c.name === formData.to.name);
       
-      // 🟢 FIX: Use null coalescing to satisfy 'string | null' type requirement
       const safeProfile = {
         logo: profile?.logo_url ?? null,
         name: profile?.company_name ?? null,
@@ -230,7 +253,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
 
       const blob = await generatePdf({
         documentType,
-        // 🟢 FIX: Provide fallback strings for mandatory fields
         brandColor: formData.brandColor || '#319795',
         invoiceNumber: formData.invoiceNumber || '',
         invoiceDate: formData.invoiceDate || '',
@@ -247,7 +269,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         },
         to: {
             ...formData.to,
-            // 🟢 FIX: Use null instead of undefined for missing phone
             phone: selectedClient?.phone ?? null,
         },
         lineItems: formData.lineItems.map(item => ({
@@ -303,7 +324,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       }
       toast({ title: 'Success!', description: `Your ${documentType} has been saved.`, status: 'success', duration: 3000, isClosable: true });
     } catch (error: any) {
-      // Ignore redirect error
       if (error.message === 'NEXT_REDIRECT' || error.digest?.includes('NEXT_REDIRECT')) return;
       toast({ title: 'Operation Failed', description: error.message, status: 'error' });
     } finally {
@@ -328,7 +348,6 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
                 <Text fontSize="xs" fontWeight="bold" letterSpacing="wide" color={mutedText} mb={2}>FROM</Text>
                 <Text fontWeight="bold">{profile?.company_name || 'Your Company Name'}</Text>
                 <Text fontSize="sm" color={mutedText}>{profile?.company_address || 'No address set'}</Text>
-                {/* 🟢 ADDED: Visual check for user */}
                 {senderEmail && <Text fontSize="xs" color="blue.500">{senderEmail}</Text>}
                 {profile?.company_phone && <Text fontSize="xs" color="blue.500">{profile.company_phone}</Text>}
               </Box>
@@ -402,6 +421,10 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
           </FormSection>
 
           <FormSection title="Notes & Terms">
+            {/* 🟢 VISUAL INDICATOR for which default is being used */}
+            <Text fontSize="xs" color="gray.400" mb={1} textAlign="right">
+                Using default {documentType} terms
+            </Text>
             <Textarea {...register('notes')} placeholder="e.g. Payment due within 30 days. Banking details..." rows={4} focusBorderColor={focusBorderColor} resize="none" />
           </FormSection>
         </VStack>
@@ -412,7 +435,15 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
           <FormSection title="Settings">
             <HStack justify="space-between" align="center" p={3} bg={useColorModeValue('gray.50', 'gray.700')} borderRadius="md" mb={4}>
               <Text fontWeight='bold' fontSize="sm" color={documentType === 'Quote' ? primaryColor : 'gray.500'}>QUOTE</Text>
-              <Switch isChecked={documentType === 'Invoice'} onChange={(e) => setDocumentType(e.target.checked ? 'Invoice' : 'Quote')} colorScheme="teal" size="lg" />
+              
+              {/* 🟢 UPDATED SWITCH HANDLER */}
+              <Switch 
+                isChecked={documentType === 'Invoice'} 
+                onChange={(e) => handleDocTypeChange(e.target.checked)} 
+                colorScheme="teal" 
+                size="lg" 
+              />
+              
               <Text fontWeight='bold' fontSize="sm" color={documentType === 'Invoice' ? primaryColor : 'gray.500'}>INVOICE</Text>
             </HStack>
             

@@ -1,5 +1,3 @@
-// Location: src/types/profile.d.ts
-
 export type PaymentProviderType = 'paystack' | 'yoco' | 'paypal' | 'manual';
 
 export interface PaymentProvider {
@@ -22,6 +20,7 @@ export interface UserProfile {
   vat_number?: string | null;
   logo_url?: string | null;
   terms_conditions?: string | null;
+  proposal_default_notes?: string | null; // NEW: Distinct notes for proposals
   // NEW: Matches the JSONB column in DB
   payment_settings?: PaymentSettings | null; 
 }

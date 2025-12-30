@@ -29,6 +29,7 @@ type ProfileWithBanking = ProfileRow & {
   currency?: string | null;
   payment_settings?: PaymentSettings | null; 
   signature_url?: string | null; 
+  proposal_default_notes?: string | null;
 };
 
 type SettingsFormProps = {
@@ -114,6 +115,7 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
   const [vatNumber, setVatNumber] = useState(profile?.vat_number || '');
   const [currency, setCurrency] = useState(profile?.currency || 'ZAR');
   const [terms, setTerms] = useState(profile?.terms_conditions || '');
+  const [proposalTerms, setProposalTerms] = useState(profile?.proposal_default_notes || '');
   
   // Banking States
   const [bankName, setBankName] = useState(profile?.bank_name || '');
@@ -167,7 +169,9 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
     
     const payload = {
       id: user.id, 
-      company_name: companyName, company_address: companyAddress, company_phone: companyPhone, vat_number: vatNumber, currency: currency, terms_conditions: terms,
+      company_name: companyName, company_address: companyAddress, company_phone: companyPhone, vat_number: vatNumber, currency: currency, 
+      terms_conditions: terms,
+      proposal_default_notes: proposalTerms,
       bank_name: bankName, account_holder: accountHolder, account_number: accountNumber, branch_code: branchCode, branch_name: branchName, account_type: accountType,
       payment_settings: paymentConfig, 
       updated_at: new Date().toISOString(),
@@ -291,11 +295,31 @@ export default function SettingsForm({ user, profile }: SettingsFormProps) {
               </SimpleGrid>
             </SettingsSection>
             
-            <SettingsSection title="Terms & Conditions" icon={FileText}>
-              <FormControl>
-                <FormLabel>Default Footer Text</FormLabel>
-                <Textarea focusBorderColor={focusBorderColor} value={terms} onChange={(e) => setTerms(e.target.value)} rows={4} resize="none"/>
-              </FormControl>
+            <SettingsSection title="Document Defaults" icon={FileText}>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                <FormControl>
+                  <FormLabel>Invoice Payment Terms</FormLabel>
+                  <Textarea 
+                    focusBorderColor={focusBorderColor} 
+                    value={terms} 
+                    onChange={(e) => setTerms(e.target.value)} 
+                    rows={4} 
+                    resize="none" 
+                    placeholder="e.g. Payment due in 14 days. Interest charged on overdue accounts."
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Proposal Footer / Terms</FormLabel>
+                  <Textarea 
+                    focusBorderColor={focusBorderColor} 
+                    value={proposalTerms} 
+                    onChange={(e) => setProposalTerms(e.target.value)} 
+                    rows={4} 
+                    resize="none" 
+                    placeholder="e.g. This proposal is valid for 30 days. 50% deposit required to commence work."
+                  />
+                </FormControl>
+              </SimpleGrid>
             </SettingsSection>
 
             <Flex justify="flex-end" pt={4}>

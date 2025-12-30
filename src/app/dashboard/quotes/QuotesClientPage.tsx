@@ -26,6 +26,11 @@ interface Quote {
     email?: string;
     phone?: string;
   };
+  // Updated to include payment_settings for link extraction
+  profiles?: {
+    company_name: string;
+    payment_settings?: any; 
+  } | { company_name: string; payment_settings?: any }[]; 
 }
 
 interface Props {
@@ -67,6 +72,30 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
 
   const handleFilterStatus = (status: string) => {
     router.push(`${pathname}?${createQueryString('status', status)}`);
+  };
+
+  // --- HELPERS ---
+  const getBusinessName = (doc: Quote) => {
+    if (!doc.profiles) return "My Business";
+    const profile = Array.isArray(doc.profiles) ? doc.profiles[0] : doc.profiles;
+    return profile?.company_name || "My Business";
+  };
+
+  // 🟢 NEW: Logic to extract the specific Payment Provider URL (e.g. PayPal)
+  const getActivePaymentLink = (doc: Quote) => {
+    // 1. Quote specific override
+    if (doc.payment_link) return doc.payment_link;
+
+    // 2. Profile default provider
+    const profile = Array.isArray(doc.profiles) ? doc.profiles[0] : doc.profiles;
+    if (profile?.payment_settings) {
+       const settings = profile.payment_settings as unknown as PaymentSettings;
+       if (settings.default_provider && Array.isArray(settings.providers)) {
+          const provider = settings.providers.find(p => p.id === settings.default_provider);
+          return provider?.url;
+       }
+    }
+    return undefined;
   };
 
   // --- ACTIONS ---
@@ -153,10 +182,14 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
   };
 
   const handleDelete = async (id: string) => {
-    if(!confirm('Are you sure you want to delete this document?')) return;
     startTransition(async () => {
       const result = await deleteQuoteAction(id);
-      if(result.success) { toast({ title: 'Deleted', status: 'success' }); router.refresh(); }
+      if(result.success) { 
+          toast({ title: 'Document Deleted', status: 'success', duration: 3000 }); 
+          router.refresh(); 
+      } else {
+          toast({ title: 'Could not delete', description: result.message, status: 'error' });
+      }
     });
   };
 
@@ -238,6 +271,7 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
               documents.map((doc) => {
                 const isInvoice = doc.document_type?.toLowerCase() === 'invoice';
                 const isPaid = doc.status?.toLowerCase() === 'paid';
+                const docType = isInvoice ? 'invoice' : 'quote';
 
                 let IconComp = FileText;
                 let colorScheme = 'purple';
@@ -290,12 +324,20 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
                     </Td>
 
                     <Td><Badge colorScheme={getStatusColor(doc.status)}>{doc.status}</Badge></Td>
-                    {/* 🟢 FIX: Consistent date formatting to avoid hydration errors */}
                     <Td fontSize="sm" color="gray.600">{new Date(doc.created_at).toLocaleDateString('en-GB')}</Td>
                     <Td isNumeric fontWeight="bold" fontFamily="mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: doc.currency || 'USD' }).format(doc.total || 0)}</Td>
                     <Td isNumeric onClick={(e) => e.stopPropagation()}>
                         <Flex justify="flex-end" gap={2}>
-                            <ShareInvoice quoteId={doc.id} invoiceNumber={doc.invoice_number} clientName={doc.clients?.name} clientEmail={doc.clients?.email} isIconOnly={true} />
+                            <ShareInvoice 
+                              quoteId={doc.id} 
+                              invoiceNumber={doc.invoice_number} 
+                              clientName={doc.clients?.name} 
+                              clientEmail={doc.clients?.email} 
+                              isIconOnly={true} 
+                              businessName={getBusinessName(doc)}
+                              type={docType}
+                              paymentLink={getActivePaymentLink(doc)} // 🟢 PASSING DIRECT LINK
+                            />
                             
                             <Menu>
                                 <MenuButton as={IconButton} icon={<MoreVertical size={16} />} variant="ghost" size="sm" isLoading={downloadingId === doc.id} />

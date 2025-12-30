@@ -16,12 +16,11 @@ import {
   useDisclosure,
   useToast,
   Icon,
-  useColorModeValue // 🟢 Added for Dark Mode support
+  useColorModeValue
 } from '@chakra-ui/react';
 import { FaWhatsapp } from 'react-icons/fa';
 import { FiMail, FiBell } from 'react-icons/fi';
 import { useState, useTransition } from 'react';
-// 🟢 FIX: Ensure this path matches the file location exactly
 import { sendInvoiceEmail } from '@/app/actions/sendInvoiceEmail';
 
 interface InvoiceReminderProps {
@@ -31,6 +30,7 @@ interface InvoiceReminderProps {
   amount: string;
   dueDate: string;
   clientEmail?: string | null;
+  paymentLink?: string | null; // 🟢 NEW: Direct payment URL
 }
 
 export default function InvoiceReminder({
@@ -39,14 +39,15 @@ export default function InvoiceReminder({
   clientName,
   amount,
   dueDate,
-  clientEmail
+  clientEmail,
+  paymentLink // 🟢 Destructured
 }: InvoiceReminderProps) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState('');
 
-  // 🟢 FIX: Dynamic Colors for Light/Dark Mode
+  // UI Colors
   const textareaBg = useColorModeValue('gray.50', 'gray.700');
   const textareaTextColor = useColorModeValue('gray.800', 'white');
   const textareaBorder = useColorModeValue('gray.200', 'gray.600');
@@ -58,23 +59,33 @@ export default function InvoiceReminder({
   const emailButtonHover = useColorModeValue('gray.100', 'gray.700');
 
   const handleOpen = () => {
-    // Construct the deep link and message template on open
-    // Check for window existence to prevent SSR hydration mismatches
+    // 1. Construct Links
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const paymentLink = `${origin}/p/${quoteId}`;
+    const viewLink = `${origin}/p/${quoteId}`;
     
-    // Formatting date if possible, otherwise use raw string
+    // 🟢 LOGIC: Use direct payment link if provided (e.g. PayPal), 
+    // otherwise fallback to QuotePilot portal deep link.
+    const finalPaymentLink = paymentLink || `${origin}/p/${quoteId}?action=pay`;
+    
+    // 2. Format Date
     let formattedDate = dueDate;
     try {
       formattedDate = new Date(dueDate).toLocaleDateString();
     } catch (e) { /* ignore invalid dates */ }
 
-    // UPDATED COPY: Professional, clear, and directs to secure payment
-    const template = `Hi ${clientName}, this is a friendly reminder regarding invoice ${invoiceNumber} for ${amount}, due on ${formattedDate}.
+    // 3. TEMPLATE B: INVOICE — WHATSAPP (PAYMENT REMINDER)
+    const template = `Hi ${clientName},
 
-You can pay securely online here: ${paymentLink}
+Just a friendly reminder that invoice ${invoiceNumber}
+for ${amount} was due on ${formattedDate}.
 
-Thank you!`;
+View the invoice:
+${viewLink}
+
+Pay securely online:
+${finalPaymentLink}
+
+Thank you 🙏`;
     
     setMessage(template);
     onOpen();
@@ -84,7 +95,6 @@ Thank you!`;
     if (!message.trim()) return;
     
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    // Only open window on client side
     if (typeof window !== 'undefined') {
         window.open(whatsappUrl, '_blank');
     }
@@ -105,11 +115,11 @@ Thank you!`;
     }
 
     startTransition(async () => {
-      // Calls the Server Action
-      const result = await sendInvoiceEmail(quoteId);
+      // Pass 'true' to trigger the specific REMINDER email template (Template D)
+      const result = await sendInvoiceEmail(quoteId, true);
       
       if (result.success) {
-        toast({ title: "Reminder Sent", description: "Email copy sent successfully.", status: "success" });
+        toast({ title: "Reminder Sent", description: `Email reminder sent to ${clientEmail}`, status: "success" });
         onClose();
       } else {
         toast({ title: "Error", description: result.message, status: "error" });
@@ -138,19 +148,20 @@ Thank you!`;
           <ModalBody>
             <VStack spacing={4} align="stretch">
               <Text fontSize="sm" color={helperTextColor}>
-                Customize your message below. The payment link is automatically included.
+                Review the message below. It includes links to view and pay the invoice.
               </Text>
               
               <Textarea 
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                minHeight="150px"
+                minHeight="240px" 
                 placeholder="Write your reminder message..."
-                size="md"
+                size="sm"
                 bg={textareaBg}
                 color={textareaTextColor}
                 borderColor={textareaBorder}
                 _focus={{ borderColor: 'orange.400', boxShadow: '0 0 0 1px var(--chakra-colors-orange-400)' }}
+                fontFamily="monospace" // Monospace helps visualize line breaks for WhatsApp
               />
 
               {!clientEmail && (
@@ -172,7 +183,7 @@ Thank you!`;
                 onClick={handleWhatsApp}
                 flex={1}
               >
-                WhatsApp
+                Open WhatsApp
               </Button>
               
               <Button 
@@ -186,7 +197,7 @@ Thank you!`;
                 bg={emailButtonBg}
                 _hover={{ bg: emailButtonHover }}
               >
-                Email
+                Send Email
               </Button>
             </HStack>
           </ModalFooter>

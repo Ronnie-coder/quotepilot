@@ -7,10 +7,8 @@ import ShareInvoice from '@/components/ShareInvoice';
 import InvoiceReminder from '@/components/InvoiceReminder';
 import NextLink from 'next/link';
 import { FilePenLine, ArrowLeft } from 'lucide-react';
-// 🟢 FIX: Import Database type directly
 import { Database } from '@/types/supabase';
 
-// 🟢 FIX: Manually define Row types
 type QuoteRow = Database['public']['Tables']['quotes']['Row'];
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
@@ -38,6 +36,10 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
     return `${currency} ${Number(amt).toFixed(2)}`;
   };
 
+  // Extract Business Name and Document Type for ShareInvoice templates
+  const businessName = profile?.company_name || "My Business";
+  const docType = (quote.document_type?.toLowerCase() === 'invoice') ? 'invoice' : 'quote';
+
   return (
     <VStack spacing={8} align="stretch">
       {/* HEADER SECTION */}
@@ -55,20 +57,25 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
            {/* 1. Share Button & Reminder Integrated in Header */}
            {isViewing && (
              <>
-               <InvoiceReminder 
-                  quoteId={quote.id}
-                  invoiceNumber={quote.invoice_number || ""}
-                  clientName={quote.clients?.name || "Client"}
-                  amount={formatAmount(quote.total, quote.currency)}
-                  dueDate={quote.due_date || ""}
-                  clientEmail={quote.clients?.email}
-               />
+               {/* Only show reminder button for Invoices, not Quotes */}
+               {docType === 'invoice' && (
+                 <InvoiceReminder 
+                    quoteId={quote.id}
+                    invoiceNumber={quote.invoice_number || ""}
+                    clientName={quote.clients?.name || "Client"}
+                    amount={formatAmount(quote.total, quote.currency)}
+                    dueDate={quote.due_date || ""}
+                    clientEmail={quote.clients?.email}
+                 />
+               )}
                
                <ShareInvoice 
                  quoteId={quote.id} 
                  clientName={quote.clients?.name || "Client"} 
                  invoiceNumber={quote.invoice_number || ""}
                  clientEmail={quote.clients?.email || ""}
+                 businessName={businessName}
+                 type={docType}
                />
              </>
            )}
@@ -96,7 +103,6 @@ export default function QuotePageClient({ quote, profile, clients, isViewing }: 
       {isViewing ? (
         <DocumentViewer quote={quote as any} profile={profile} />
       ) : (
-        // 🟢 FIX: Cast profile to any to bypass Json vs PaymentSettings mismatch
         <InvoiceForm profile={profile as any} clients={clients} defaultValues={quote} />
       )}
     </VStack>

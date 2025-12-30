@@ -7,7 +7,13 @@ import { mapToPdfPayload } from "@/utils/pdfMapper";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function sendInvoiceEmail(quoteId: string) {
+// Helper type for JSON column
+interface PaymentSettings {
+  default_provider?: string;
+  providers?: { id: string; url: string; }[];
+}
+
+export async function sendInvoiceEmail(quoteId: string, forceReminder: boolean = false) {
   // Validate Environment
   if (!process.env.RESEND_API_KEY) {
     console.error("❌ RESEND_API_KEY is missing from environment variables.");
@@ -42,25 +48,73 @@ export async function sendInvoiceEmail(quoteId: string) {
     return { success: false, message: "Client has no email address." };
   }
 
-  // 3. Fetch the Freelancer's Real Email
-  const { data: userData } = await supabase.auth.admin.getUserById(quote.user_id);
-  const freelancerEmail = userData?.user?.email || "support@coderon.co.za";
-
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const publicLink = `${origin}/p/${quoteId}`;
+  // 3. Determine Context (Invoice vs Quote, New vs Reminder)
+  const docType = (quote.document_type || 'invoice').toLowerCase() as 'invoice' | 'quote';
+  
+  // Logic: It's a reminder if explicitly requested OR if the invoice is marked Overdue
+  const isReminder = forceReminder || (docType === 'invoice' && quote.status === 'Overdue');
+  
   const senderDisplayName = profile?.company_name || "QuotePilot User";
   
-  // Validate Sender
+  // 4. Construct Links & Subject Lines
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const viewLink = `${origin}/p/${quoteId}`;
+  
+  // PAYMENT LINK LOGIC:
+  // - Quotes: undefined (hidden)
+  // - Invoices: Try to find DIRECT provider link (PayPal/PayStack) first. 
+  //   Fallback to Public View with ?action=pay if no direct link exists.
+  let paymentLink: string | undefined = undefined;
+
+  if (docType === 'invoice') {
+    // 1. Check for a specific override on the quote itself (if you have that field)
+    if (quote.payment_link) {
+        paymentLink = quote.payment_link;
+    } 
+    // 2. Check Profile Payment Settings
+    else if (profile?.payment_settings) {
+        const settings = profile.payment_settings as unknown as PaymentSettings;
+        if (settings.default_provider && Array.isArray(settings.providers)) {
+            const provider = settings.providers.find(p => p.id === settings.default_provider);
+            if (provider?.url) {
+                paymentLink = provider.url;
+            }
+        }
+    }
+
+    // 3. Fallback to Portal Deep Link if no external link found
+    if (!paymentLink) {
+        paymentLink = `${viewLink}?action=pay`;
+    }
+  }
+
+  // Set Subject Line
+  let emailSubject = "";
+
+  if (docType === 'quote') {
+    // TEMPLATE F: QUOTE
+    emailSubject = `Proposal from ${senderDisplayName}`;
+  } else if (isReminder) {
+    // TEMPLATE D: INVOICE REMINDER
+    emailSubject = `Payment reminder: Invoice ${quote.invoice_number}`;
+  } else {
+    // TEMPLATE C: NEW INVOICE
+    emailSubject = `Invoice ${quote.invoice_number} from ${senderDisplayName}`;
+  }
+
+  // 5. Fetch the Freelancer's Real Email (for Reply-To)
+  const { data: userData } = await supabase.auth.admin.getUserById(quote.user_id);
+  const freelancerEmail = userData?.user?.email || "support@coderon.co.za";
   const fromEmail = 'QuotePilot <billing@coderon.co.za>';
 
   try {
-    // 4. Generate the PDF for Attachment
+    // 6. Generate the PDF for Attachment
     console.log(`📄 Generating PDF for Quote ${quoteId}...`);
     const pdfPayload = mapToPdfPayload(quote, profile, client, freelancerEmail);
     const pdfBlob = await generatePdf(pdfPayload);
     const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer());
 
-    // 5. Render Email
+    // 7. Render Email
     const { render } = await import("@react-email/render");
     const { default: InvoiceEmail } = await import("@/components/email/InvoiceEmail");
 
@@ -70,23 +124,26 @@ export async function sendInvoiceEmail(quoteId: string) {
         invoiceNumber: quote.invoice_number || "Draft",
         amount: `${quote.currency || 'ZAR'} ${Number(quote.total).toFixed(2)}`,
         dueDate: new Date(quote.due_date).toLocaleDateString(),
-        publicLink: publicLink,
+        publicLink: viewLink,
+        paymentLink: paymentLink, // Now contains the DIRECT link if available
         senderName: senderDisplayName,
+        documentType: docType,    // 'invoice' | 'quote'
+        isReminder: isReminder,   // true | false
       })
     );
 
-    // 6. Send Email with Attachment
-    console.log(`📧 Sending email via Resend to: ${client.email}`);
+    // 8. Send Email via Resend
+    console.log(`📧 Sending email via Resend to: ${client.email} | Subject: ${emailSubject}`);
 
     const { error: resendError } = await resend.emails.send({
       from: fromEmail, 
       to: [client.email], 
       replyTo: freelancerEmail,
-      subject: `Invoice #${quote.invoice_number} from ${senderDisplayName}`,
+      subject: emailSubject,
       html: emailHtml,
       attachments: [
         {
-          filename: `${quote.document_type || 'Invoice'}_${quote.invoice_number}.pdf`,
+          filename: `${docType === 'quote' ? 'Proposal' : 'Invoice'}_${quote.invoice_number}.pdf`,
           content: pdfBuffer,
         },
       ],
@@ -97,7 +154,7 @@ export async function sendInvoiceEmail(quoteId: string) {
       return { success: false, message: `Email delivery failed: ${resendError.message}` };
     }
 
-    // 7. Auto-update status to 'Sent' if it was draft
+    // 9. Auto-update status to 'Sent' if it was draft
     if (quote.status === 'Draft') {
         console.log(`🔄 Updating Quote ${quoteId} status to Sent`);
         await supabase.from('quotes').update({ status: 'Sent' }).eq('id', quoteId);

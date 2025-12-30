@@ -15,7 +15,6 @@ import {
 import { FiShare2, FiLink, FiMail, FiCheck } from 'react-icons/fi';
 import { FaWhatsapp } from 'react-icons/fa';
 import { useState, useTransition } from 'react';
-// 🟢 FIX: Correct import path (added /app/)
 import { sendInvoiceEmail } from '@/app/actions/sendInvoiceEmail'; 
 
 interface ShareInvoiceProps {
@@ -23,6 +22,9 @@ interface ShareInvoiceProps {
   invoiceNumber: string;
   clientName: string;
   clientEmail?: string | null;
+  businessName: string; 
+  type?: 'invoice' | 'quote'; 
+  paymentLink?: string | null; // 🟢 NEW: Direct payment URL (PayPal/PayStack etc)
   size?: "sm" | "md";
   isIconOnly?: boolean;
 }
@@ -32,6 +34,9 @@ export default function ShareInvoice({
   invoiceNumber, 
   clientName, 
   clientEmail,
+  businessName,
+  type = 'invoice', 
+  paymentLink, // 🟢 Destructured
   size = "md",
   isIconOnly = false
 }: ShareInvoiceProps) {
@@ -58,12 +63,45 @@ export default function ShareInvoice({
   // 2. Logic for WhatsApp
   const handleWhatsApp = () => {
     const origin = window.location.origin;
-    const url = `${origin}/p/${quoteId}`;
+    const viewLink = `${origin}/p/${quoteId}`;
+
+    // 🟢 LOGIC: Use direct payment link if provided (e.g. PayPal), 
+    // otherwise fallback to QuotePilot portal deep link.
+    const finalPaymentLink = paymentLink || `${origin}/p/${quoteId}?action=pay`; 
     
-    // UPDATED COPY: More direct, action-oriented, and friendly for chat
-    const rawMessage = `Hi ${clientName}, sending over invoice #${invoiceNumber}. You can view details and pay securely online here: ${url}`;
+    let rawMessage = "";
+
+    if (type === 'quote') {
+      // TEMPLATE E: QUOTE — WHATSAPP (PROPOSAL STYLE)
+      // No payment links allowed.
+      rawMessage = `Hi ${clientName},
+
+I’ve sent you a proposal outlining the work and pricing.
+
+You can review it here:
+${viewLink}
+
+If everything looks good, I’ll convert it to an invoice.
+
+Thanks 🙏`;
+
+    } else {
+      // TEMPLATE A: INVOICE — WHATSAPP (NEW INVOICE)
+      // Must include viewing AND payment links.
+      rawMessage = `Hi ${clientName},
+
+I’ve sent you invoice ${invoiceNumber} from ${businessName}.
+
+View the invoice:
+${viewLink}
+
+Pay securely online:
+${finalPaymentLink}
+
+Thank you 🙏`;
+    }
+
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(rawMessage)}`;
-    
     window.open(whatsappUrl, '_blank');
   };
 
@@ -75,6 +113,7 @@ export default function ShareInvoice({
     }
 
     startTransition(async () => {
+      // The server action handles its own payment link logic lookup
       const result = await sendInvoiceEmail(quoteId);
 
       if (result.success) {
@@ -115,8 +154,8 @@ export default function ShareInvoice({
         {TriggerButton}
         <MenuList>
           <Box px={3} py={2} borderBottomWidth="1px" borderColor="gray.100" mb={1}>
-            <Text fontSize="xs" fontWeight="bold" color="gray.500">
-              INVOICE #{invoiceNumber}
+            <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase">
+              {type} #{invoiceNumber}
             </Text>
           </Box>
           <MenuItem icon={hasCopied ? <FiCheck /> : <FiLink />} onClick={handleCopyLink}>

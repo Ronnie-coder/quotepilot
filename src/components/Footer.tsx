@@ -95,7 +95,7 @@ const Footer = () => {
   `;
 
   // 🟢 BUMPED VERSION
-  const appVersion = "v3.2.2-stable";
+  const appVersion = " v3.3.0-stable";
 
   const containerVariants = {
     hidden: { opacity: 0 },

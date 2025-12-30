@@ -5,12 +5,10 @@ const QUOTEPILOT_LOGO_URL = "https://mjcyhwryzgpaqqdyydgl.supabase.co/storage/v1
 
 // 1.0 HELPERS
 
-// 🟢 NEW: Lightweight Phone Validation
-// Prevents rendering invalid "Tel:" lines (e.g., empty strings, or just "N/A")
+// Lightweight Phone Validation
 const validatePhone = (phone?: string | null): string | null => {
   if (!phone) return null;
   const clean = phone.trim();
-  // Must have at least 6 digits to be considered a printable phone number
   const digitCount = clean.replace(/\D/g, '').length;
   if (digitCount < 6) return null; 
   return clean;
@@ -33,22 +31,18 @@ const formatDate = (dateStr?: string | null) => {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-// 🟢 FIXED: Handles both Server (Email) and Client (Browser) environments
 const getBase64FromUrl = async (url: string): Promise<string | null> => {
   try {
     const cleanUrl = `${url}?t=${new Date().getTime()}`; 
     const response = await fetch(cleanUrl);
     if (!response.ok) return null;
 
-    // CHECK: Are we on the server?
     if (typeof window === 'undefined') {
-      // 🟢 SERVER SIDE (Node.js) - Use Buffer
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const contentType = response.headers.get("content-type") || "image/png";
       return `data:${contentType};base64,${buffer.toString("base64")}`;
     } else {
-      // 🟢 CLIENT SIDE (Browser) - Use FileReader
       const blob = await response.blob();
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -74,7 +68,6 @@ const generateQR = async (text: string): Promise<string> => {
 }
 
 // 2.0 THE GENERATOR ENGINE
-// Uses strict InvoicePdfPayload to ensure data consistency
 export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   const jsPDF = (await import('jspdf')).default;
   const autoTable = (await import('jspdf-autotable')).default;
@@ -82,18 +75,45 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
   // --- BRAND IDENTITY ---
-  // Fallback to Teal if brandColor is missing/empty
   const COLOR_PRIMARY = data.brandColor || '#319795'; 
   const COLOR_TEXT_MAIN = '#1A202C'; 
   const COLOR_TEXT_MUTED = '#718096'; 
   const CURRENCY = data.currency || 'ZAR'; 
   
+  const isQuote = (data.documentType || 'invoice').toLowerCase() === 'quote';
+  
+  // Dynamic Labels
+  const documentTitle = isQuote ? "PROPOSAL" : "INVOICE";
+  const termsLabel = isQuote ? "TERMS & CONDITIONS:" : "PAYMENT TERMS / NOTES:";
+  const dueLabel = isQuote ? "Valid Until:" : "Due Date:";
+  const totalLabel = isQuote ? "Estimated Total:" : "Total Due:";
+
   const margin = 20;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   let yPos = margin;
 
-  // --- 1. HEADER & USER LOGO ---
+  // --- 1. HEADER LOGIC (LAYOUT FLIPPED) ---
+  
+  // A: DOCUMENT TITLE & META (NOW TOP LEFT)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(24);
+  doc.setTextColor(isQuote ? '#805AD5' : COLOR_PRIMARY); 
+  doc.text(documentTitle, margin, yPos + 10, { align: 'left' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(COLOR_TEXT_MUTED);
+  doc.text(`#${data.invoiceNumber || 'DRAFT'}`, margin, yPos + 18, { align: 'left' });
+  doc.text(`Date: ${formatDate(data.invoiceDate)}`, margin, yPos + 23, { align: 'left' });
+  
+  if (data.dueDate) {
+    doc.text(`${dueLabel} ${formatDate(data.dueDate)}`, margin, yPos + 28, { align: 'left' });
+  }
+
+  // B: LOGO & COMPANY INFO (NOW TOP RIGHT)
+  let logoBottomY = yPos;
+  
   if (data.logo) {
     const userLogo = await getBase64FromUrl(data.logo);
     if (userLogo) {
@@ -101,97 +121,84 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
           const imgProps = doc.getImageProperties(userLogo);
           const pdfWidth = 40; 
           const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-          doc.addImage(userLogo, 'PNG', margin, yPos, pdfWidth, pdfHeight);
+          
+          // 🟢 Draw Logo Aligned Right
+          doc.addImage(userLogo, 'PNG', pageWidth - margin - pdfWidth, yPos, pdfWidth, pdfHeight);
+          logoBottomY = yPos + pdfHeight + 5;
         } catch (err) {}
     }
   }
 
-  // Document Title
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(24);
-  doc.setTextColor(COLOR_PRIMARY);
-  doc.text(data.documentType.toUpperCase(), pageWidth - margin, yPos + 10, { align: 'right' });
-
-  // Meta Data
-  doc.setFont('helvetica', 'normal');
+  // Company Details (Under Logo, Aligned Right)
   doc.setFontSize(10);
+  doc.setTextColor(COLOR_TEXT_MAIN);
+  doc.setFont('helvetica', 'bold');
+  
+  let infoY = logoBottomY > (yPos + 35) ? logoBottomY : (yPos + 10); 
+  if(!data.logo) infoY = yPos + 10; // Fallback if no logo
+
+  doc.text(data.from.name || '', pageWidth - margin, infoY, { align: 'right' });
+  infoY += 5;
+
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(COLOR_TEXT_MUTED);
-  doc.text(`#${data.invoiceNumber || 'DRAFT'}`, pageWidth - margin, yPos + 18, { align: 'right' });
-  doc.text(`Date: ${formatDate(data.invoiceDate)}`, pageWidth - margin, yPos + 23, { align: 'right' });
-  if (data.documentType === 'Invoice' && data.dueDate) {
-    doc.text(`Due: ${formatDate(data.dueDate)}`, pageWidth - margin, yPos + 28, { align: 'right' });
+  doc.setFontSize(9);
+  
+  if (data.from.address) {
+     // Split address for right alignment is tricky in jsPDF, simpler to just list it or rely on single lines
+     // For robustness, we assume single line or short address here, or user manually breaks lines in profile settings
+     const addressLines = doc.splitTextToSize(data.from.address, 60);
+     doc.text(addressLines, pageWidth - margin, infoY, { align: 'right' });
+     infoY += (addressLines.length * 4);
   }
 
-  yPos += 45; 
+  if (data.from.email) {
+      doc.text(data.from.email, pageWidth - margin, infoY, { align: 'right' });
+      infoY += 4;
+  }
+  const senderPhone = validatePhone(data.from.phone);
+  if (senderPhone) {
+      doc.text(senderPhone, pageWidth - margin, infoY, { align: 'right' });
+      infoY += 4;
+  }
 
-  // --- 2. ADDRESSES (REWRITTEN FOR PERFECT ALIGNMENT) ---
-  const colWidth = (pageWidth - (margin * 2)) / 2;
+  yPos = Math.max(infoY, yPos + 45) + 10; 
+
+  // --- 2. ADDRESSES (CLIENT "BILL TO") ---
+  // Since Company Info is now in Header, we only need "Bill To" on the Left
+  
   const startAddressY = yPos;
+  
+  // BILL TO (Left Side)
+  doc.setFontSize(8);
+  doc.setTextColor(COLOR_PRIMARY);
+  doc.setFont('helvetica', 'bold');
+  doc.text(isQuote ? 'PREPARED FOR' : 'BILL TO', margin, startAddressY);
+  
+  let clientY = startAddressY + 5;
+  doc.setFontSize(10);
+  doc.setTextColor(COLOR_TEXT_MAIN);
+  doc.text(data.to.name || '', margin, clientY);
+  clientY += 5;
 
-  // Helper to render an address block dynamically
-  const renderAddressBlock = (
-      title: string, 
-      details: { name?: string | null, address?: string | null, email?: string | null, phone?: string | null }, 
-      x: number, 
-      y: number
-  ) => {
-      let currentY = y;
-      
-      // LABEL (FROM / BILL TO)
-      doc.setFontSize(8);
-      doc.setTextColor(COLOR_PRIMARY);
-      doc.setFont('helvetica', 'bold');
-      doc.text(title, x, currentY);
-      currentY += 5;
+  if (data.to.address) {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(COLOR_TEXT_MUTED);
+      const addressLines = doc.splitTextToSize(data.to.address, 80);
+      doc.text(addressLines, margin, clientY);
+      clientY += (addressLines.length * 4.5);
+  } else {
+    clientY += 2; 
+  }
 
-      // NAME
-      doc.setFontSize(10);
-      doc.setTextColor(COLOR_TEXT_MAIN);
-      doc.text(details.name || '', x, currentY);
-      currentY += 5;
-
-      // ADDRESS (Multi-line)
-      if (details.address) {
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(COLOR_TEXT_MUTED);
-          const addressLines = doc.splitTextToSize(details.address, colWidth - 5);
-          doc.text(addressLines, x, currentY);
-          currentY += (addressLines.length * 4.5);
-      } else {
-        currentY += 2; // small gap if no address
-      }
-
-      // CONTACT INFO (Phone/Email) with Icons/Labels
-      const contactStart = currentY + 1;
-      
-      if (details.email) {
-          doc.setFontSize(9);
-          doc.setTextColor(COLOR_TEXT_MUTED);
-          doc.text(`Email: ${details.email}`, x, contactStart);
-          currentY = contactStart + 5;
-      }
-      
-      // 🟢 VALIDATION: Check phone before rendering
-      const validPhone = validatePhone(details.phone);
-      if (validPhone) {
-          const phoneY = details.email ? currentY : contactStart;
-          doc.setFontSize(9);
-          doc.setTextColor(COLOR_TEXT_MUTED);
-          doc.text(`Tel: ${validPhone}`, x, phoneY);
-          currentY = phoneY + 5;
-      }
-
-      return currentY;
-  };
-
-  // Render FROM
-  const fromBottomY = renderAddressBlock('FROM', data.from, margin, startAddressY);
-
-  // Render TO
-  const toBottomY = renderAddressBlock('BILL TO', data.to, margin + colWidth, startAddressY);
-
-  // Set yPos to the lowest point of either column + padding
-  yPos = Math.max(fromBottomY, toBottomY) + 10;
+  if (data.to.email) {
+      doc.setFontSize(9);
+      doc.setTextColor(COLOR_TEXT_MUTED);
+      doc.text(`Email: ${data.to.email}`, margin, clientY);
+      clientY += 5;
+  }
+  
+  yPos = clientY + 10;
 
   // --- 3. ITEMS TABLE ---
   const tableData = data.lineItems.map(item => [
@@ -207,7 +214,7 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
     body: tableData,
     theme: 'grid',
     styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: COLOR_TEXT_MAIN },
-    headStyles: { fillColor: COLOR_PRIMARY, textColor: '#FFFFFF', fontStyle: 'bold' },
+    headStyles: { fillColor: isQuote ? '#805AD5' : COLOR_PRIMARY, textColor: '#FFFFFF', fontStyle: 'bold' },
     columnStyles: {
       0: { cellWidth: 'auto' },
       1: { halign: 'center', cellWidth: 20 },
@@ -225,18 +232,21 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   // -- LEFT COLUMN: Notes, Bank, SIGNATURE --
   let leftY = finalY;
 
+  // NOTES / TERMS
   if (data.notes) {
     doc.setFontSize(8);
     doc.setTextColor(COLOR_TEXT_MUTED);
     doc.setFont('helvetica', 'bold');
-    doc.text('NOTES / TERMS:', leftColX, leftY);
+    doc.text(termsLabel, leftColX, leftY);
     doc.setFont('helvetica', 'normal');
-    const noteLines = doc.splitTextToSize(data.notes, colWidth - 5);
+    // Using slightly narrower width for notes to separate from totals
+    const noteLines = doc.splitTextToSize(data.notes, 90); 
     doc.text(noteLines, leftColX, leftY + 5);
     leftY += 10 + (noteLines.length * 4);
   }
 
-  if (data.payment && (data.payment.bankName || data.payment.accNumber)) {
+  // BANK DETAILS (INVOICE ONLY)
+  if (!isQuote && data.payment && (data.payment.bankName || data.payment.accNumber)) {
     leftY += 5;
     doc.setFontSize(8);
     doc.setTextColor(COLOR_PRIMARY);
@@ -288,11 +298,9 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   const subtotalStr = formatCurrency(data.subtotal, CURRENCY);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  
   doc.setTextColor(COLOR_TEXT_MAIN);
   const subWidth = doc.getTextWidth(subtotalStr);
   doc.text(subtotalStr, rightColX, rightY, { align: 'right' });
-  
   doc.setTextColor(COLOR_TEXT_MUTED);
   doc.text('Subtotal:', rightColX - subWidth - 5, rightY, { align: 'right' });
 
@@ -303,7 +311,6 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
     doc.setTextColor(COLOR_TEXT_MAIN);
     const vatWidth = doc.getTextWidth(vatStr);
     doc.text(vatStr, rightColX, rightY, { align: 'right' });
-    
     doc.setTextColor(COLOR_TEXT_MUTED);
     doc.text(`VAT (${data.vatRate}%):`, rightColX - vatWidth - 5, rightY, { align: 'right' });
   }
@@ -316,23 +323,23 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   doc.setFont('helvetica', 'bold');
   const totalWidth = doc.getTextWidth(totalStr);
   
-  doc.setTextColor(COLOR_PRIMARY);
+  doc.setTextColor(isQuote ? '#805AD5' : COLOR_PRIMARY);
   doc.text(totalStr, rightColX, rightY, { align: 'right' });
 
   doc.setFontSize(12);
   doc.setTextColor(COLOR_TEXT_MAIN);
-  doc.text('Total:', rightColX - totalWidth - 6, rightY, { align: 'right' });
+  doc.text(totalLabel, rightColX - totalWidth - 6, rightY, { align: 'right' });
 
   if(data.dueDate) {
      rightY += 6;
      doc.setFontSize(9);
      doc.setTextColor(COLOR_TEXT_MUTED);
      doc.setFont('helvetica', 'normal');
-     doc.text(`Due by ${formatDate(data.dueDate)}`, rightColX, rightY, { align: 'right' });
+     doc.text(`${dueLabel} ${formatDate(data.dueDate)}`, rightColX, rightY, { align: 'right' });
   }
 
-  // QR CODE
-  if (data.paymentLink) {
+  // QR CODE & PAYMENT LINK (INVOICE ONLY)
+  if (!isQuote && data.paymentLink) {
     const btnY = rightY + 10;
     const btnWidth = 40;
     const btnHeight = 12;

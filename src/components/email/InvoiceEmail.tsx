@@ -20,7 +20,10 @@ interface InvoiceEmailProps {
   amount: string;
   dueDate: string;
   publicLink: string;
+  paymentLink?: string; // Undefined for quotes
   senderName: string;
+  documentType?: 'invoice' | 'quote';
+  isReminder?: boolean;
 }
 
 export const InvoiceEmail = ({
@@ -29,16 +32,47 @@ export const InvoiceEmail = ({
   amount,
   dueDate,
   publicLink,
+  paymentLink,
   senderName,
+  documentType = 'invoice',
+  isReminder = false,
 }: InvoiceEmailProps) => {
   
   // Ensure we have a valid base URL for assets
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://quotepilot.coderon.co.za'; 
+  const isQuote = documentType === 'quote';
+
+  // --- CONTENT LOGIC BASED ON TEMPLATES ---
+  
+  let previewText = "";
+  let headingText = "";
+  let bodyText = "";
+  let closingText = "";
+
+  if (isQuote) {
+    // TEMPLATE F: QUOTE
+    previewText = `Proposal from ${senderName}`;
+    headingText = "Proposal for Services";
+    bodyText = `Please find the proposal attached for your review. You can also view it online below.`;
+    closingText = "If you’re happy to proceed, let me know and I’ll send the invoice.";
+  } else if (isReminder) {
+    // TEMPLATE D: INVOICE REMINDER
+    previewText = `Payment Reminder: Invoice #${invoiceNumber}`;
+    headingText = `Payment Reminder: #${invoiceNumber}`;
+    bodyText = `This is a friendly reminder that invoice ${invoiceNumber} for ${amount} was due on ${dueDate}.`;
+    closingText = "If you’ve already made payment, thank you — please ignore this message.";
+  } else {
+    // TEMPLATE C: NEW INVOICE
+    previewText = `Invoice #${invoiceNumber} from ${senderName}`;
+    headingText = `Invoice #${invoiceNumber}`;
+    bodyText = `${senderName} has sent you an invoice for ${amount}.`;
+    closingText = "If you have any questions, please let us know.";
+  }
 
   return (
     <Html>
       <Head />
-      <Preview>Invoice #{invoiceNumber} due on {dueDate} - Action Required</Preview>
+      <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
           
@@ -54,40 +88,52 @@ export const InvoiceEmail = ({
              <Text style={brandName}>QuotePilot</Text>
           </Section>
 
-          <Heading style={h1}>Invoice #{invoiceNumber}</Heading>
+          <Heading style={h1}>{headingText}</Heading>
           
           <Text style={text}>Hi {clientName},</Text>
-          <Text style={text}>
-            Here are the details for your invoice from <strong>{senderName}</strong>. 
-            Please arrange for payment of <strong>{amount}</strong> by the due date below.
-          </Text>
+          <Text style={text}>{bodyText}</Text>
 
-          {/* INVOICE STATS */}
+          {/* DOCUMENT STATS (Contextual) */}
           <Section style={statsContainer}>
-            <Text style={statLabel}>INVOICE NUMBER</Text>
+            <Text style={statLabel}>{isQuote ? "PROPOSAL REF" : "INVOICE NUMBER"}</Text>
             <Text style={statValue}>#{invoiceNumber}</Text>
             
-            <Text style={statLabel}>DUE DATE</Text>
-            <Text style={statValue}>{dueDate}</Text>
+            {!isQuote && (
+              <>
+                <Text style={statLabel}>AMOUNT DUE</Text>
+                <Text style={statValue}>{amount}</Text>
+                <Text style={statLabel}>DUE DATE</Text>
+                <Text style={statValue}>{dueDate}</Text>
+              </>
+            )}
           </Section>
 
-          {/* CTA BUTTON */}
+          {/* PRIMARY ACTION BUTTON */}
           <Section style={btnContainer}>
-            <Button style={button} href={publicLink}>
-              Pay Invoice Now
+            {/* If it's an Invoice, button goes to PAYMENT link. If Quote, button goes to VIEW link. */}
+            <Button 
+              style={button} 
+              href={isQuote ? publicLink : (paymentLink || publicLink)}
+            >
+              {isQuote ? "View Proposal" : "Pay Invoice Now"}
             </Button>
           </Section>
 
+          {/* SECONDARY LINK TEXT */}
           <Text style={text}>
-            or pay via this link: <Link href={publicLink} style={link}>{publicLink}</Link>
+            {isQuote ? "View online:" : "View invoice details:"}{" "}
+            <Link href={publicLink} style={link}>{publicLink}</Link>
           </Text>
+
+          {/* CLOSING TEXT */}
+          <Text style={text}>{closingText}</Text>
 
           <Hr style={hr} />
 
-          {/* 🔥 FEATURE 2: VIRAL GROWTH FOOTER */}
+          {/* FOOTER */}
           <Section style={footer}>
             <Text style={footerText}>
-              Powered by <Link href="https://quotepilot.coderon.co.za" style={footerLink}>QuotePilot</Link> — Professional Invoicing
+              Sent with <Link href="https://quotepilot.coderon.co.za" style={footerLink}>QuotePilot</Link> — Get paid faster
             </Text>
           </Section>
 
@@ -167,6 +213,7 @@ const statLabel = {
   textTransform: "uppercase" as const,
   letterSpacing: "1px",
   marginBottom: "4px",
+  marginTop: "12px",
 };
 
 const statValue = {
