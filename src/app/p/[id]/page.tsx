@@ -22,15 +22,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const anyQuote = quote as any;
   const profileData = Array.isArray(anyQuote.profiles) ? anyQuote.profiles[0] : anyQuote.profiles;
   const company = profileData?.company_name || 'Freelancer';
-  const type = anyQuote.document_type || 'Invoice';
+  
+  // 🟢 LOGIC: Distinguish between Invoice and Proposal (Quote)
+  const rawType = anyQuote.document_type || 'invoice';
+  const isProposal = rawType.toLowerCase() === 'quote';
+  const displayType = isProposal ? 'Proposal' : 'Invoice';
   const number = anyQuote.invoice_number;
 
+  // 🟢 SAFETY: Ensure proposals have neutral metadata (No "Pay Securely" wording)
+  const metaTitle = `${displayType} #${number} from ${company}`;
+  const metaDescription = isProposal 
+    ? `View proposal from ${company}.`
+    : `Invoice from ${company}. Pay securely online.`;
+
   return {
-    title: `${type} #${number} from ${company}`,
-    description: `View, download, and pay securely via QuotePilot.`,
+    title: metaTitle,
+    description: metaDescription,
     openGraph: {
-      title: `${type} #${number} from ${company}`,
-      description: 'Secure Payment Link',
+      title: metaTitle,
+      description: metaDescription, // Replaces generic "Secure Payment Link"
       images: ['/og-image.png'], 
     },
   };

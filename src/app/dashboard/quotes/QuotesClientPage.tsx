@@ -1,15 +1,96 @@
 'use client';
 
 import {
-  Box, Table, Thead, Tbody, Tr, Th, Td, Badge, IconButton, Menu, MenuButton, MenuList, MenuItem, Button, Flex, Text, useToast, Container, Input, InputGroup, InputLeftElement, Select, useColorModeValue, VStack, Icon, HStack
+  Box, Table, Thead, Tbody, Tr, Th, Td, Badge, IconButton, Menu, MenuButton, MenuList, MenuItem, Button, Flex, Text, useToast, Container, Input, InputGroup, InputLeftElement, Select, useColorModeValue, VStack, Icon,
+  AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay
 } from '@chakra-ui/react';
-import { MoreVertical, Search, FileText, Download, Trash2, CheckCircle, Send, ExternalLink, FileQuestion, DollarSign } from 'lucide-react';
+import { MoreVertical, Search, FileText, Download, CheckCircle, Send, ExternalLink, FileQuestion, DollarSign, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useState, useTransition, useCallback } from 'react';
-import { deleteQuoteAction, updateDocumentStatusAction, getQuoteForPdf } from './actions';
+import { useState, useTransition, useCallback, useRef } from 'react';
+import { updateDocumentStatusAction, getQuoteForPdf, deleteQuoteAction } from './actions';
 import { generatePdf } from '@/utils/pdfGenerator';
 import ShareInvoice from '@/components/ShareInvoice';
 import { PaymentSettings } from '@/types/profile';
+
+// --- INTERNAL COMPONENT: DELETE DIALOG ---
+// We define this here to prevent file system/import crashes
+type DeleteQuoteDialogProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  quoteId: string | null;
+  clientName: string;
+};
+
+function DeleteQuoteDialog({ isOpen, onClose, quoteId, clientName }: DeleteQuoteDialogProps) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const toast = useToast();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const handleDelete = () => {
+    if (!quoteId) return;
+
+    startTransition(async () => {
+      const result = await deleteQuoteAction(quoteId);
+
+      if (result.success) {
+        toast({
+          title: 'Document Deleted',
+          description: `The document for ${clientName} has been permanently removed.`,
+          status: 'success',
+          duration: 3000,
+        });
+        router.refresh();
+        onClose();
+      } else {
+        toast({
+          title: 'Delete Failed',
+          description: result.error,
+          status: 'error',
+        });
+      }
+    });
+  };
+
+  return (
+    <AlertDialog
+      isOpen={isOpen}
+      leastDestructiveRef={cancelRef}
+      onClose={onClose}
+      isCentered
+    >
+      <AlertDialogOverlay bg="blackAlpha.300" backdropFilter="blur(2px)">
+        <AlertDialogContent>
+          <AlertDialogHeader fontSize="lg" fontWeight="bold" color="red.600">
+            Confirm Deletion
+          </AlertDialogHeader>
+
+          <AlertDialogBody>
+            Are you sure you want to delete this document for <strong>{clientName}</strong>?
+            <br /><br />
+            This action creates a permanent record gap and cannot be undone.
+          </AlertDialogBody>
+
+          <AlertDialogFooter>
+            <Button ref={cancelRef} onClick={onClose} isDisabled={isPending} variant="ghost">
+              Cancel
+            </Button>
+            <Button
+              colorScheme="red"
+              onClick={handleDelete}
+              ml={3}
+              isLoading={isPending}
+            >
+              Delete Permanently
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogOverlay>
+    </AlertDialog>
+  );
+}
+
+// --- MAIN PAGE COMPONENT ---
 
 interface Quote {
   id: string;
@@ -44,8 +125,10 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const toast = useToast();
-  const [isPending, startTransition] = useTransition();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // 🟢 STATE: Track which quote is being deleted
+  const [quoteToDelete, setQuoteToDelete] = useState<{ id: string, name: string } | null>(null);
 
   // --- FILTER LOGIC ---
   const createQueryString = useCallback(
@@ -81,10 +164,7 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
   };
 
   const getActivePaymentLink = (doc: Quote) => {
-    // 1. Quote specific override
     if (doc.payment_link) return doc.payment_link;
-
-    // 2. Profile default provider
     const profile = Array.isArray(doc.profiles) ? doc.profiles[0] : doc.profiles;
     if (profile?.payment_settings) {
        const settings = profile.payment_settings as unknown as PaymentSettings;
@@ -105,7 +185,6 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
 
       const { quote, profile } = result;
 
-      // Determine Payment Link
       let activePaymentLink = quote.payment_link;
       if (!activePaymentLink && profile.payment_settings) {
          const settings = profile.payment_settings as unknown as PaymentSettings;
@@ -115,7 +194,6 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
          }
       }
 
-      // Generate PDF
       const blob = await generatePdf({
         documentType: (quote.document_type as 'Invoice' | 'Quote') || 'Quote',
         brandColor: quote.brand_color || '#319795', 
@@ -168,28 +246,15 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
   };
 
   const handleStatusUpdate = async (id: string, newStatus: string) => {
-    startTransition(async () => {
-      const result = await updateDocumentStatusAction(id, newStatus);
-      if (result.success) {
-        toast({ title: 'Status Updated', status: 'success' });
-        router.refresh();
-      } else {
-        toast({ title: 'Error', description: result.error, status: 'error' });
-      }
-    });
-  };
-
-  const handleDelete = async (id: string) => {
-    startTransition(async () => {
-      const result = await deleteQuoteAction(id);
-      if(result.success) { 
-          toast({ title: 'Document Deleted', status: 'success', duration: 3000 }); 
-          router.refresh(); 
-      } else {
-          // 🟢 FIX: Changed result.message to result.error to pass build
-          toast({ title: 'Could not delete', description: result.error, status: 'error' });
-      }
-    });
+    // We can't use startTransition here easily with async/await in the same scope, 
+    // so we just call the action directly. The router.refresh handles the UI update.
+    const result = await updateDocumentStatusAction(id, newStatus);
+    if (result.success) {
+      toast({ title: 'Status Updated', status: 'success' });
+      router.refresh();
+    } else {
+      toast({ title: 'Error', description: result.error, status: 'error' });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -338,14 +403,25 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
                               paymentLink={getActivePaymentLink(doc)}
                             />
                             
-                            <Menu>
+                            <Menu isLazy>
                                 <MenuButton as={IconButton} icon={<MoreVertical size={16} />} variant="ghost" size="sm" isLoading={downloadingId === doc.id} />
                                 <MenuList>
                                     <MenuItem icon={<FileText size={16} />} onClick={() => router.push(`/quote/${doc.id}`)}>Edit / View</MenuItem>
                                     <MenuItem icon={<Download size={16} />} onClick={() => handleDownload(doc.id)}>Download PDF</MenuItem>
                                     <MenuItem icon={<CheckCircle size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Paid')}>Mark as Paid</MenuItem>
                                     <MenuItem icon={<Send size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Sent')}>Mark as Sent</MenuItem>
-                                    <MenuItem icon={<Trash2 size={16} />} color="red.500" onClick={() => handleDelete(doc.id)}>Delete</MenuItem>
+                                    
+                                    {/* 🟢 ACTION: Trigger Modal State */}
+                                    <MenuItem 
+                                        icon={<Trash2 size={16} />} 
+                                        color="red.500" 
+                                        onClick={(e) => {
+                                            e.stopPropagation(); 
+                                            setQuoteToDelete({ id: doc.id, name: doc.clients?.name || 'this document' });
+                                        }}
+                                    >
+                                        Delete
+                                    </MenuItem>
                                 </MenuList>
                             </Menu>
                         </Flex>
@@ -370,6 +446,15 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
           </Tbody>
         </Table>
       </Box>
+
+      {/* 🟢 DIALOG: RENDERED INTERNALLY */}
+      <DeleteQuoteDialog 
+        isOpen={!!quoteToDelete} 
+        onClose={() => setQuoteToDelete(null)} 
+        quoteId={quoteToDelete?.id || null} 
+        clientName={quoteToDelete?.name || ''} 
+      />
+
     </Container>
   );
 }

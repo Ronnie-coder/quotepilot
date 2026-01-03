@@ -2,13 +2,11 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import QuotesClientPage from './QuotesClientPage';
 
-// 🟢 FIX: Define Props with Promise for Next.js 15+
 interface QuotesPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default async function QuotesPage({ searchParams }: QuotesPageProps) {
-  // 🟢 FIX: Await the Supabase Client (required since cookies() is async)
   const supabase = await createSupabaseServerClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -16,16 +14,16 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
     redirect('/sign-in');
   }
 
-  // 1. GET PROFILE SETTINGS
+  // 🟢 FIX: Fetch FULL profile (Company Name, Payment Settings, Currency)
+  // This ensures "My Business" is replaced with the real name in the Dashboard list.
   const { data: profile } = await supabase
     .from('profiles')
-    .select('currency')
+    .select('*')
     .eq('id', user.id)
     .single();
 
   const systemCurrency = profile?.currency || 'USD'; 
 
-  // 🟢 FIX: Await searchParams before accessing properties (Next.js 15 breaking change)
   const params = await searchParams;
 
   const searchQuery = (params.q as string) || '';
@@ -79,12 +77,10 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
 
   if (error) {
     console.error('Error fetching documents:', error);
-    // Return empty state rather than crashing
     return <QuotesClientPage documents={[]} count={0} page={1} limit={limit} />;
   }
 
   // 3. FORMATTING
-  // Safely map documents, handling cases where joined client data might be missing or in different formats
   const formattedDocuments =
     (documents as any[])?.map((doc: any) => {
       const clientData = Array.isArray(doc.clients) ? doc.clients[0] : doc.clients;
@@ -94,6 +90,8 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
         currency: doc.currency || systemCurrency,
         client_id: doc.client_id || clientData?.id,
         clients: clientData || { name: 'Unknown Client', email: '', id: '' },
+        // 🟢 INJECT PROFILE: This passes 'company_name' to the Client Component
+        profiles: profile 
       };
     }) || [];
 

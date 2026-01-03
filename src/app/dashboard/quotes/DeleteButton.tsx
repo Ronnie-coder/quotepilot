@@ -42,7 +42,6 @@ export function DeleteButton({ quoteId, clientName, isDisabled }: DeleteButtonPr
           isClosable: true,
         });
       } else {
-        // 🟢 SUCCESS TOAST ADDED
         toast({
           title: 'Document Purged',
           description: `The document for ${clientName} has been permanently removed.`,

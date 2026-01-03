@@ -255,6 +255,7 @@ export default function DashboardClientPage({
                     </HStack>
                     <Badge colorScheme="brand" variant="subtle">Last 6 Months</Badge>
                 </Flex>
+                {/* 🟢 FIX: Enforce fixed height wrapper */}
                 <Box h="300px" w="100%">
                   {revenueData && revenueData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -287,6 +288,7 @@ export default function DashboardClientPage({
               {/* Pie Chart */}
               <Flex direction="column" bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={borderColor} shadow="sm" p={6} h="full" minH="400px" minWidth={0}>
                 <HStack mb={4}><Icon as={PieChartIcon} color="orange.400" boxSize={5} /><Heading size="md" color={headingColor}>Invoice Health</Heading></HStack>
+                {/* 🟢 FIX: Enforce fixed height wrapper */}
                 <Box h="300px" w="100%" position="relative">
                   {totalInvoices > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -319,11 +321,6 @@ export default function DashboardClientPage({
                 <VStack spacing={0} align="stretch">
                   {recentDocuments && recentDocuments.length > 0 ? (
                     recentDocuments.map((doc, index) => {
-                      // RULES IMPLEMENTED:
-                      // 1. Quote -> FileText
-                      // 2. Paid Invoice -> DollarSign
-                      // 3. Draft/Sent Invoice -> FileText
-                      
                       const isInvoice = doc.document_type?.toLowerCase() === 'invoice';
                       const isPaid = doc.status?.toLowerCase() === 'paid';
                       const showMoneyIcon = isInvoice && isPaid;

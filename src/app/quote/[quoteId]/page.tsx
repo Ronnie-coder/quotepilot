@@ -2,21 +2,17 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import QuotePageClient from './QuotePageClient';
 
-// 🟢 FIX: Added searchParams to Props definition
 interface QuotePageProps {
   params: Promise<{ quoteId: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default async function QuotePage({ params, searchParams }: QuotePageProps) {
-  // 🟢 FIX: Await Supabase
   const supabase = await createSupabaseServerClient();
   
-  // 🟢 FIX: Await Params & Search Params
   const { quoteId } = await params;
-  const search = await searchParams; // Next.js 15+ requires awaiting searchParams
+  const search = await searchParams;
 
-  // Check if edit mode is active
   const isEditMode = search.edit === 'true';
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -52,7 +48,6 @@ export default async function QuotePage({ params, searchParams }: QuotePageProps
       quote={quote} 
       profile={profileResult.data} 
       clients={clientsResult.data || []} 
-      // 🟢 FIX: Dynamically toggle view/edit mode
       isViewing={!isEditMode} 
     />
   );

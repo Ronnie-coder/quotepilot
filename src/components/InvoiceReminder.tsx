@@ -30,7 +30,7 @@ interface InvoiceReminderProps {
   amount: string;
   dueDate: string;
   clientEmail?: string | null;
-  paymentLink?: string | null; // 🟢 NEW: Direct payment URL
+  paymentLink?: string | null;
 }
 
 export default function InvoiceReminder({
@@ -40,7 +40,7 @@ export default function InvoiceReminder({
   amount,
   dueDate,
   clientEmail,
-  paymentLink // 🟢 Destructured
+  paymentLink
 }: InvoiceReminderProps) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
@@ -55,37 +55,37 @@ export default function InvoiceReminder({
   const helperTextColor = useColorModeValue('gray.600', 'gray.400');
   const warningBg = useColorModeValue('orange.50', 'rgba(237, 137, 54, 0.1)');
   const warningText = useColorModeValue('orange.700', 'orange.200');
-  const emailButtonBg = useColorModeValue('white', 'gray.800');
-  const emailButtonHover = useColorModeValue('gray.100', 'gray.700');
 
   const handleOpen = () => {
-    // 1. Construct Links
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const viewLink = `${origin}/p/${quoteId}`;
     
-    // 🟢 LOGIC: Use direct payment link if provided (e.g. PayPal), 
-    // otherwise fallback to QuotePilot portal deep link.
-    const finalPaymentLink = paymentLink || `${origin}/p/${quoteId}?action=pay`;
+    // Payment Logic
+    let paymentSection = "";
+    if (paymentLink) {
+      paymentSection = `Pay securely online:\n${paymentLink}`;
+    } else {
+      const fallbackLink = `${origin}/p/${quoteId}?action=pay`;
+      paymentSection = `View payment details:\n${fallbackLink}`;
+    }
     
-    // 2. Format Date
+    // Date Logic
     let formattedDate = dueDate;
     try {
       formattedDate = new Date(dueDate).toLocaleDateString();
-    } catch (e) { /* ignore invalid dates */ }
+    } catch (e) { /* ignore */ }
 
-    // 3. TEMPLATE B: INVOICE — WHATSAPP (PAYMENT REMINDER)
+    // REMINDER TEMPLATE (Short, Direct, No Emojis)
     const template = `Hi ${clientName},
 
-Just a friendly reminder that invoice ${invoiceNumber}
-for ${amount} was due on ${formattedDate}.
+This is a reminder that invoice ${invoiceNumber} for ${amount} was due on ${formattedDate}.
 
-View the invoice:
+View invoice:
 ${viewLink}
 
-Pay securely online:
-${finalPaymentLink}
+${paymentSection}
 
-Thank you 🙏`;
+Thank you.`;
     
     setMessage(template);
     onOpen();
@@ -115,11 +115,10 @@ Thank you 🙏`;
     }
 
     startTransition(async () => {
-      // Pass 'true' to trigger the specific REMINDER email template (Template D)
       const result = await sendInvoiceEmail(quoteId, true);
       
       if (result.success) {
-        toast({ title: "Reminder Sent", description: `Email reminder sent to ${clientEmail}`, status: "success" });
+        toast({ title: "Reminder Sent", description: `Sent to ${clientEmail}`, status: "success" });
         onClose();
       } else {
         toast({ title: "Error", description: result.message, status: "error" });
@@ -148,20 +147,19 @@ Thank you 🙏`;
           <ModalBody>
             <VStack spacing={4} align="stretch">
               <Text fontSize="sm" color={helperTextColor}>
-                Review the message below. It includes links to view and pay the invoice.
+                Review the message below.
               </Text>
               
               <Textarea 
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 minHeight="240px" 
-                placeholder="Write your reminder message..."
                 size="sm"
                 bg={textareaBg}
                 color={textareaTextColor}
                 borderColor={textareaBorder}
-                _focus={{ borderColor: 'orange.400', boxShadow: '0 0 0 1px var(--chakra-colors-orange-400)' }}
-                fontFamily="monospace" // Monospace helps visualize line breaks for WhatsApp
+                _focus={{ borderColor: 'orange.400' }}
+                fontFamily="monospace"
               />
 
               {!clientEmail && (
@@ -194,8 +192,6 @@ Thank you 🙏`;
                 isDisabled={!clientEmail}
                 variant="outline"
                 flex={1}
-                bg={emailButtonBg}
-                _hover={{ bg: emailButtonHover }}
               >
                 Send Email
               </Button>

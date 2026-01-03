@@ -24,7 +24,7 @@ interface ShareInvoiceProps {
   clientEmail?: string | null;
   businessName: string; 
   type?: 'invoice' | 'quote'; 
-  paymentLink?: string | null; // 🟢 NEW: Direct payment URL (PayPal/PayStack etc)
+  paymentLink?: string | null;
   size?: "sm" | "md";
   isIconOnly?: boolean;
 }
@@ -36,7 +36,7 @@ export default function ShareInvoice({
   clientEmail,
   businessName,
   type = 'invoice', 
-  paymentLink, // 🟢 Destructured
+  paymentLink,
   size = "md",
   isIconOnly = false
 }: ShareInvoiceProps) {
@@ -44,7 +44,6 @@ export default function ShareInvoice({
   const [isPending, startTransition] = useTransition(); 
   const [hasCopied, setHasCopied] = useState(false);
 
-  // 1. Logic for Copy Link
   const handleCopyLink = () => {
     const origin = window.location.origin;
     const url = `${origin}/p/${quoteId}`;
@@ -60,52 +59,53 @@ export default function ShareInvoice({
     setTimeout(() => setHasCopied(false), 2000);
   };
 
-  // 2. Logic for WhatsApp
   const handleWhatsApp = () => {
     const origin = window.location.origin;
     const viewLink = `${origin}/p/${quoteId}`;
-
-    // 🟢 LOGIC: Use direct payment link if provided (e.g. PayPal), 
-    // otherwise fallback to QuotePilot portal deep link.
-    const finalPaymentLink = paymentLink || `${origin}/p/${quoteId}?action=pay`; 
     
     let rawMessage = "";
 
     if (type === 'quote') {
-      // TEMPLATE E: QUOTE — WHATSAPP (PROPOSAL STYLE)
-      // No payment links allowed.
+      // PROPOSAL TEMPLATE (No emojis, professional)
       rawMessage = `Hi ${clientName},
 
-I’ve sent you a proposal outlining the work and pricing.
+Here is the proposal outlining the work and pricing.
 
-You can review it here:
+Review it here:
 ${viewLink}
 
-If everything looks good, I’ll convert it to an invoice.
+Let me know if you have any questions.
 
-Thanks 🙏`;
+Best regards,
+${businessName}`;
 
     } else {
-      // TEMPLATE A: INVOICE — WHATSAPP (NEW INVOICE)
-      // Must include viewing AND payment links.
+      // INVOICE TEMPLATE (Prioritizes Payment Link, No emojis)
+      let paymentSection = "";
+
+      if (paymentLink) {
+        paymentSection = `Pay securely online:\n${paymentLink}`;
+      } else {
+        const fallbackLink = `${origin}/p/${quoteId}?action=pay`; 
+        paymentSection = `View payment details:\n${fallbackLink}`;
+      }
+
       rawMessage = `Hi ${clientName},
 
-I’ve sent you invoice ${invoiceNumber} from ${businessName}.
+Here is invoice ${invoiceNumber} from ${businessName}.
 
-View the invoice:
+View invoice:
 ${viewLink}
 
-Pay securely online:
-${finalPaymentLink}
+${paymentSection}
 
-Thank you 🙏`;
+Thank you.`;
     }
 
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(rawMessage)}`;
     window.open(whatsappUrl, '_blank');
   };
 
-  // 3. Logic for Smart Email
   const handleEmailSend = () => {
     if (!clientEmail) {
       toast({ title: "Missing Email", description: "Client has no email saved.", status: "warning" });
@@ -113,7 +113,6 @@ Thank you 🙏`;
     }
 
     startTransition(async () => {
-      // The server action handles its own payment link logic lookup
       const result = await sendInvoiceEmail(quoteId);
 
       if (result.success) {

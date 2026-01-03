@@ -1,11 +1,11 @@
-// FILE: src/middleware.ts
-// MISSION: FINAL STABILIZATION - REFINE REDIRECT LOGIC
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 export async function middleware(req: NextRequest) {
+  // 1. Create response placeholder
   const res = NextResponse.next();
+  
+  // 2. Initialize Supabase Client
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -18,26 +18,27 @@ export async function middleware(req: NextRequest) {
     }
   );
 
+  // 3. Check Session
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = req.nextUrl;
 
   const publicPaths = ['/', '/sign-in', '/sign-up', '/forgot-password', '/update-password', '/callback'];
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
 
-  // If user is not logged in and trying to access a protected route, redirect to sign-in
+  // RULE A: Protect Private Routes
   if (!user && !isPublicPath) {
     return NextResponse.redirect(new URL('/sign-in', req.url));
   }
 
+  // RULE B: Redirect Logged-In Users away from Auth Pages
   if (user) {
-    // If a logged-in user tries to access auth pages, send them to the dashboard.
     const authPaths = ['/', '/sign-in', '/sign-up', '/forgot-password'];
     if (authPaths.includes(pathname)) {
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 
-    // [TARGET MODIFIED] The onboarding check is now scoped ONLY to dashboard routes.
-    // This prevents it from interfering with other flows like password updates.
+    // RULE C: Onboarding Check (Only on Dashboard)
+    // Prevents "My Business" placeholder issue by forcing setup
     if (pathname.startsWith('/dashboard') && pathname !== '/dashboard/settings') {
       const { data: profile } = await supabase
         .from('profiles')
@@ -57,7 +58,8 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
+  // 🟢 OPTIMIZED MATCHER: Excludes static files, images, icons to reduce noise
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
