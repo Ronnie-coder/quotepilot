@@ -13,8 +13,7 @@ import {
   Flex,
   SimpleGrid,
   Stack,
-  Avatar,
-  Badge
+  Avatar
 } from '@chakra-ui/react';
 import NextLink from 'next/link';
 import { useEffect, useRef } from 'react';
@@ -63,16 +62,17 @@ const FeatureStep = ({ icon, step, title, text }: { icon: any, step: string, tit
 const TestimonialCard = ({ quote, author, company }: { quote: string, author: string, company: string }) => {
   const bg = useColorModeValue('gray.50', 'gray.900');
   return (
-    <Box bg={bg} p={8} rounded="xl" position="relative">
+    <Box bg={bg} p={8} rounded="xl" position="relative" maxW="2xl" mx="auto" textAlign="center">
       <Icon as={Quote} position="absolute" top={6} left={6} size={24} color="teal.500" opacity={0.2} fill="currentColor" />
-      <VStack align="start" spacing={6} position="relative" zIndex={1}>
-        <Text fontSize="md" fontStyle="italic" fontWeight="medium" pt={4}>
+      <VStack align="center" spacing={6} position="relative" zIndex={1}>
+        <Text fontSize="xl" fontStyle="italic" fontWeight="medium" pt={4}>
           "{quote}"
         </Text>
         <HStack>
           <Avatar name={author} size="sm" bg="teal.600" color="white" />
-          <Box>
+          <Box textAlign="left">
             <Text fontWeight="bold" fontSize="sm">{company}</Text>
+            <Text fontSize="xs" color="gray.500">{author}</Text>
           </Box>
         </HStack>
       </VStack>
@@ -320,23 +320,19 @@ export default function LandingPageClient() {
             </Container>
         </Box>
 
-        {/* === 3. TESTIMONIALS === */}
+        {/* === 3. TESTIMONIALS (UPDATED) === */}
         <Box py={24} bg={useColorModeValue('white', 'gray.900')}>
             <Container maxW="container.lg">
                 <VStack spacing={12}>
                     <Heading size="lg" textAlign="center">Trusted by Real Businesses</Heading>
-                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8} w="full">
+                    {/* Centered single testimonial */}
+                    <Box w="full">
                         <TestimonialCard 
                             company="Palmsure Insurance Brokers"
                             author="Roy"
                             quote="QuotePilot helps us send professional invoices faster and track payments with ease."
                         />
-                        <TestimonialCard 
-                            company="MD Travels"
-                            author="MD Travels"
-                            quote="Simple, reliable, and built for the way we do business."
-                        />
-                    </SimpleGrid>
+                    </Box>
                 </VStack>
             </Container>
         </Box>
