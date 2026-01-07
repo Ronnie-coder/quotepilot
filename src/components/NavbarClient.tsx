@@ -22,7 +22,6 @@ import {
   Avatar,
   Text,
   MenuDivider,
-  Tooltip,
   Badge,
   Container,
   chakra,
@@ -66,8 +65,6 @@ const TYPE_COLOR_MAP: Record<string, string> = {
   info: 'blue'
 };
 
-const TAGLINE = "Join fellow pilots across Africa 🌍";
-
 // --- MOTION COMPONENTS ---
 const MotionList = chakra(motion.ul, {
   shouldForwardProp: (prop) => isValidMotionProp(prop) || shouldForwardProp(prop),
@@ -83,18 +80,19 @@ const authenticatedLinks = [
   { href: '/dashboard/quotes', label: 'Documents', icon: FileText },
 ];
 
+// Simplified for public view
 const unauthenticatedLinks = [
   { href: '/sign-in', label: 'Log In', variant: 'ghost' },
-  { href: '/sign-up', label: 'Start Flying', variant: 'solid' },
+  { href: '/sign-up', label: 'Sign up free', variant: 'solid' },
 ];
 
 const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
   const pathname = usePathname();
   const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
   
-  const activeColor = useColorModeValue('teal.600', 'teal.300');
+  const activeColor = useColorModeValue('brand.600', 'brand.300');
   const inactiveColor = useColorModeValue('gray.600', 'gray.400');
-  const hoverColor = useColorModeValue('teal.500', 'teal.200');
+  const hoverColor = useColorModeValue('brand.500', 'brand.200');
 
   return (
     <ChakraLink
@@ -247,7 +245,8 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
   const bgColor = useColorModeValue('rgba(255, 255, 255, 0.85)', 'rgba(23, 25, 35, 0.8)');
   const backdropFilter = "saturate(180%) blur(12px)";
   const borderColor = useColorModeValue('gray.200', 'whiteAlpha.100');
-  const logoFilter = useColorModeValue('none', 'drop-shadow(0 0 6px rgba(49, 151, 149, 0.6))'); 
+  // Removed glow filter for calmer UI
+  const logoFilter = useColorModeValue('none', 'none'); 
   const searchBg = useColorModeValue('gray.100', 'whiteAlpha.200');
   const searchBorder = useColorModeValue('gray.200', 'whiteAlpha.300');
   const userAvatarFilter = useColorModeValue('none', 'invert(1) brightness(2)');
@@ -256,8 +255,8 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast({
-      title: 'Systems powering down.',
-      description: 'See you in the skies soon, Commander.',
+      title: 'Signed out.',
+      description: 'See you soon.',
       status: 'info',
       duration: 3000,
       isClosable: true,
@@ -302,7 +301,7 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
                     </Box>
                 } 
                 color="gray.500" 
-                _hover={{ color: 'teal.500', bg: 'transparent' }} 
+                _hover={{ color: 'brand.500', bg: 'transparent' }} 
             />
         </PopoverTrigger>
         <PopoverContent borderColor={borderColor} shadow="xl" _focus={{ outline: 'none' }} width="340px">
@@ -326,7 +325,7 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
                     )}
 
                     {isLoadingNotifs && (
-                        <Flex p={4} justify="center"><Spinner size="sm" color="teal.500" /></Flex>
+                        <Flex p={4} justify="center"><Spinner size="sm" color="brand.500" /></Flex>
                     )}
 
                     {!isLoadingNotifs && notifications.length > 0 ? (
@@ -373,27 +372,23 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
         <Container maxW="container.xl" px={{ base: 4, md: 8 }}>
           <Flex h={16} alignItems="center" justifyContent="space-between">
             
-            <Tooltip label={TAGLINE} placement="bottom-start" hasArrow bg="teal.800" color="white" fontSize="xs">
-              <ChakraLink 
-                as={NextLink} 
-                href={user ? '/dashboard' : '/'} 
-                _hover={{ textDecoration: 'none' }}
-                role="group"
-              >
-                <HStack spacing={3}>
-                  <Box 
-                    filter={logoFilter} 
-                    transition="transform 0.3s ease"
-                    _groupHover={{ transform: 'rotate(-10deg) scale(1.1)' }} 
-                  >
-                    <Image src="/logo.svg" alt="QuotePilot Logo" width={32} height={32} priority />
-                  </Box>
-                  <Text fontSize="xl" fontWeight="800" letterSpacing="tight" color={useColorModeValue('gray.800', 'white')}>
-                    QuotePilot
-                  </Text>
-                </HStack>
-              </ChakraLink>
-            </Tooltip>
+            <ChakraLink 
+              as={NextLink} 
+              href={user ? '/dashboard' : '/'} 
+              _hover={{ textDecoration: 'none' }}
+              role="group"
+            >
+              <HStack spacing={3}>
+                <Box 
+                  filter={logoFilter} 
+                >
+                  <Image src="/logo.svg" alt="QuotePilot Logo" width={32} height={32} priority />
+                </Box>
+                <Text fontSize="xl" fontWeight="800" letterSpacing="tight" color={useColorModeValue('gray.800', 'white')}>
+                  QuotePilot
+                </Text>
+              </HStack>
+            </ChakraLink>
 
             <Spacer />
 
@@ -410,6 +405,7 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
 
             <Spacer display={{ base: 'none', md: 'flex' }} />
 
+            {/* COMMAND CENTER SEARCH - LOGGED IN ONLY */}
             {user && (
               <Box display={{ base: 'none', lg: 'block' }} mr={4}>
                 <Button
@@ -422,7 +418,7 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
                   w="240px" 
                   justifyContent="space-between"
                   onClick={onCmdOpen}
-                  _hover={{ borderColor: 'teal.300', color: 'teal.500' }}
+                  _hover={{ borderColor: 'brand.300', color: 'brand.500' }}
                 >
                   <HStack><Search size={14} /><Text fontSize="xs">Search clients, invoices...</Text></HStack>
                   <HStack spacing={1}><Kbd fontSize="xs" variant="outline">⌘</Kbd><Kbd fontSize="xs" variant="outline">K</Kbd></HStack>
@@ -430,54 +426,89 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
               </Box>
             )}
 
+            {/* DESKTOP ACTIONS */}
             <HStack spacing={3} display={{ base: 'none', md: 'flex' }}>
-              {user && <NotificationPopover />}
-              <IconButton onClick={onSupportOpen} variant="ghost" aria-label="Support" icon={<HelpCircle size={20} />} color="gray.500" _hover={{ color: 'teal.500', bg: 'transparent', transform: 'scale(1.1)' }} transition="all 0.2s" />
-              <IconButton onClick={toggleColorMode} variant="ghost" aria-label="Toggle Theme" icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />} color="gray.500" _hover={{ color: 'teal.500', bg: 'transparent' }} />
               
               {!user ? (
+                /* LOGGED OUT: Minimal / Trustworthy */
                 <>
-                  <Button as={NextLink} href="/sign-in" variant="ghost" fontSize="sm" fontWeight="600">Log In</Button>
-                  <Button as={NextLink} href="/sign-up" variant="solid" colorScheme="teal" size="sm" px={6} boxShadow="md" _hover={{ transform: 'translateY(-1px)', boxShadow: 'lg' }}>Sign Up Free</Button>
+                  <Button 
+                    as={NextLink} 
+                    href="/sign-in" 
+                    variant="ghost" 
+                    fontSize="sm" 
+                    fontWeight="600"
+                    color="gray.600"
+                    _hover={{ color: 'brand.600', bg: 'gray.100' }}
+                  >
+                    Log In
+                  </Button>
+                  <Button 
+                    as={NextLink} 
+                    href="/sign-up" 
+                    variant="solid" 
+                    colorScheme="brand" 
+                    size="sm" 
+                    px={6} 
+                    fontWeight="600"
+                    _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}
+                  >
+                    Sign up free
+                  </Button>
                 </>
               ) : (
-                <Menu>
-                  <MenuButton as={Button} variant="ghost" rounded="full" cursor="pointer" minW={0} px={2}>
-                    <HStack>
-                      <Avatar 
-                        size="sm" 
-                        name={userDisplayName} 
-                        src={userAvatarSrc} 
-                        bg={userAvatarSrc ? 'transparent' : 'teal.500'} 
-                        color={userAvatarSrc ? 'transparent' : 'white'}
-                        icon={userAvatarSrc ? <Box /> : undefined}
-                        sx={{ '& > img': { filter: userAvatarFilter } }}
-                      />
-                      <Box display={{ base: 'none', lg: 'block' }} textAlign="left">
-                          <Text fontSize="xs" fontWeight="bold">{userDisplayName}</Text>
+                /* LOGGED IN: Command Center */
+                <>
+                  <NotificationPopover />
+                  <IconButton onClick={onSupportOpen} variant="ghost" aria-label="Support" icon={<HelpCircle size={20} />} color="gray.500" _hover={{ color: 'brand.500', bg: 'transparent', transform: 'scale(1.1)' }} transition="all 0.2s" />
+                  <IconButton onClick={toggleColorMode} variant="ghost" aria-label="Toggle Theme" icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />} color="gray.500" _hover={{ color: 'brand.500', bg: 'transparent' }} />
+                  
+                  <Menu>
+                    <MenuButton as={Button} variant="ghost" rounded="full" cursor="pointer" minW={0} px={2}>
+                      <HStack>
+                        <Avatar 
+                          size="sm" 
+                          name={userDisplayName} 
+                          src={userAvatarSrc} 
+                          bg={userAvatarSrc ? 'transparent' : 'brand.500'} 
+                          color={userAvatarSrc ? 'transparent' : 'white'}
+                          icon={userAvatarSrc ? <Box /> : undefined}
+                          sx={{ '& > img': { filter: userAvatarFilter } }}
+                        />
+                        <Box display={{ base: 'none', lg: 'block' }} textAlign="left">
+                            <Text fontSize="xs" fontWeight="bold">{userDisplayName}</Text>
+                        </Box>
+                      </HStack>
+                    </MenuButton>
+                    <MenuList borderColor={borderColor} boxShadow="xl" p={2}>
+                      <Box px={3} py={2} bg={useColorModeValue('gray.50', 'whiteAlpha.100')} borderRadius="md" mb={2}>
+                        <Text fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Pilot Identity</Text>
+                        <Text fontSize="sm" fontWeight="medium" isTruncated maxW="200px">{user.email}</Text>
+                        <Badge mt={1} colorScheme="green" variant="subtle" fontSize="10px">SYSTEM ACTIVE</Badge>
                       </Box>
-                    </HStack>
-                  </MenuButton>
-                  <MenuList borderColor={borderColor} boxShadow="xl" p={2}>
-                    <Box px={3} py={2} bg={useColorModeValue('gray.50', 'whiteAlpha.100')} borderRadius="md" mb={2}>
-                      <Text fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Pilot Identity</Text>
-                      <Text fontSize="sm" fontWeight="medium" isTruncated maxW="200px">{user.email}</Text>
-                      <Badge mt={1} colorScheme="green" variant="subtle" fontSize="10px">SYSTEM ACTIVE</Badge>
-                    </Box>
-                    <MenuItem as={NextLink} href="/dashboard/settings" icon={<Settings size={16} />} borderRadius="md">Configuration</MenuItem>
-                    <MenuItem onClick={onSupportOpen} icon={<HelpCircle size={16} />} borderRadius="md">Support</MenuItem>
-                    <MenuDivider />
-                    <MenuItem onClick={handleLogout} icon={<LogOut size={16} />} color="red.400" borderRadius="md">Abort Session</MenuItem>
-                  </MenuList>
-                </Menu>
+                      <MenuItem as={NextLink} href="/dashboard/settings" icon={<Settings size={16} />} borderRadius="md">Configuration</MenuItem>
+                      <MenuItem onClick={onSupportOpen} icon={<HelpCircle size={16} />} borderRadius="md">Support</MenuItem>
+                      <MenuDivider />
+                      <MenuItem onClick={handleLogout} icon={<LogOut size={16} />} color="red.400" borderRadius="md">Abort Session</MenuItem>
+                    </MenuList>
+                  </Menu>
+                </>
               )}
             </HStack>
 
+            {/* MOBILE ACTIONS */}
             <Flex display={{ md: 'none' }} gap={2}>
               {user && <IconButton onClick={onCmdOpen} variant="ghost" size="sm" aria-label="Search" icon={<Search size={18} />} />}
               {user && <NotificationPopover />}
-              <IconButton onClick={toggleColorMode} variant="ghost" size="sm" aria-label="Toggle Theme" icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />} />
-              <IconButton onClick={onToggle} icon={isOpen ? <CloseIcon /> : <HamburgerIcon />} variant="ghost" aria-label="Toggle Navigation" colorScheme="teal" />
+              {user && <IconButton onClick={toggleColorMode} variant="ghost" size="sm" aria-label="Toggle Theme" icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />} />}
+              
+              <IconButton 
+                onClick={onToggle} 
+                icon={isOpen ? <CloseIcon /> : <HamburgerIcon />} 
+                variant="ghost" 
+                aria-label="Toggle Navigation" 
+                colorScheme="brand" 
+              />
             </Flex>
           </Flex>
 
@@ -486,20 +517,31 @@ const NavbarClient = ({ user, profile }: NavbarClientProps) => {
               <MotionList display="flex" flexDirection="column" gap={2} alignItems="stretch" variants={mobileMenuVariants} initial="closed" animate="open" listStyleType="none" m={0} p={0}>
                 <Divider my={2} />
                 {!user ? (
+                  /* MOBILE LOGGED OUT */
                   <>
                     {unauthenticatedLinks.map(link => (
                        <MotionListItem key={link.label} variants={mobileLinkVariants}>
-                        <Button as={NextLink} href={link.href} variant={link.variant === 'ghost' ? 'ghost' : 'solid'} colorScheme={link.variant === 'solid' ? "teal" : "gray"} w="full" onClick={handleMobileLinkClick} justifyContent="center">{link.label}</Button>
+                        <Button 
+                          as={NextLink} 
+                          href={link.href} 
+                          variant={link.variant === 'ghost' ? 'ghost' : 'solid'} 
+                          colorScheme={link.variant === 'solid' ? "brand" : "gray"} 
+                          w="full" 
+                          onClick={handleMobileLinkClick} 
+                          justifyContent="center"
+                        >
+                          {link.label}
+                        </Button>
                        </MotionListItem>
                     ))}
-                    <MotionListItem variants={mobileLinkVariants}><Button onClick={() => { handleMobileLinkClick(); onSupportOpen(); }} variant="ghost" w="full" leftIcon={<HelpCircle size={18} />}>Support</Button></MotionListItem>
                   </>
                 ) : (
+                  /* MOBILE LOGGED IN */
                   <>
                     <Box px={2} py={2}><Text fontSize="xs" color="gray.400" textTransform="uppercase" fontWeight="bold" letterSpacing="wider">Command Center</Text></Box>
                     {authenticatedLinks.map(link => (
                       <MotionListItem key={link.label} variants={mobileLinkVariants}>
-                        <Button as={NextLink} href={link.href} variant="ghost" w="full" justifyContent="flex-start" leftIcon={<Icon as={link.icon} color="teal.500" />} onClick={handleMobileLinkClick}>{link.label}</Button>
+                        <Button as={NextLink} href={link.href} variant="ghost" w="full" justifyContent="flex-start" leftIcon={<Icon as={link.icon} color="brand.500" />} onClick={handleMobileLinkClick}>{link.label}</Button>
                       </MotionListItem>
                     ))}
                     <MotionListItem variants={mobileLinkVariants}><Button as={NextLink} href="/dashboard/settings" variant="ghost" w="full" justifyContent="flex-start" leftIcon={<Settings size={18} />} onClick={handleMobileLinkClick}>Settings</Button></MotionListItem>
