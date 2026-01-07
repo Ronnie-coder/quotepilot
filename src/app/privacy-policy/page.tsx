@@ -5,10 +5,10 @@ export default function PrivacyPolicyPage() {
     <Container maxW="container.lg" py={12}>
       <VStack spacing={6} align="stretch">
         <Heading as="h1" size="2xl">Privacy Policy</Heading>
-        <Text>Last Updated: {new Date().toLocaleDateString()}</Text>
+        <Text>Last updated: 15 January 2026</Text>
 
         <Text>
-          CODERON (“us”, “we”, or “our”) operates the QuotePilot web application
+          Coderon (Pty) Ltd (“us”, “we”, or “our”) operates the QuotePilot web application
           (the “Service”). This Privacy Policy explains how we collect, store, use, and
           protect your personal information in accordance with the Protection of Personal
           Information Act (POPIA) of South Africa.
@@ -63,8 +63,8 @@ export default function PrivacyPolicyPage() {
 
         <Heading as="h2" size="lg" mt={4}>6. Changes to This Privacy Policy</Heading>
         <Text>
-          We may update this Privacy Policy periodically. Any changes will be posted on this
-          page, and the “Last Updated” date will be revised accordingly.
+          We may update this policy from time to time. Any changes will be posted on this
+          page, and the “Last updated” date will be revised accordingly.
         </Text>
 
         <Heading as="h2" size="lg" mt={4}>7. Contact Us</Heading>
@@ -74,9 +74,8 @@ export default function PrivacyPolicyPage() {
         </Text>
 
         <UnorderedList spacing={2} pl={6}>
-          <ListItem>Email: support@coderon.co.za</ListItem>
-          <ListItem>Phone/WhatsApp: 067 818 4898</ListItem>
-          <ListItem>General enquiries: info@coderon.co.za</ListItem>
+          <ListItem>Support email: support@coderon.co.za</ListItem>
+          <ListItem>General email: info@coderon.co.za</ListItem>
         </UnorderedList>
       </VStack>
     </Container>

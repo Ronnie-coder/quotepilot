@@ -20,7 +20,7 @@ import {
 } from '@chakra-ui/react';
 import NextLink from 'next/link';
 import { AuthLayout } from '@/components/AuthLayout';
-import { ShieldCheck, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import Image from 'next/image';
 
 export default function ForgotPasswordPage() {
@@ -42,8 +42,6 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     try {
-      // COMMANDER FIX: DYNAMIC ORIGIN
-      // This works on localhost AND production automatically.
       const redirectURL = `${window.location.origin}/update-password`;
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, { 
@@ -69,7 +67,7 @@ export default function ForgotPasswordPage() {
                 <Image src="/logo.svg" alt="QuotePilot" width={40} height={40} priority />
             </Box>
             <Stack align="center" spacing={1}>
-                <Heading fontSize="xl" textAlign="center" fontWeight="bold">Recover Command</Heading>
+                <Heading fontSize="xl" textAlign="center" fontWeight="bold">Reset your password</Heading>
                 <Text textAlign="center" fontSize="sm" color="gray.500">
                     Enter your email to receive a secure reset link.
                 </Text>
@@ -79,8 +77,8 @@ export default function ForgotPasswordPage() {
         {isSubmitted ? (
           <Alert status="success" variant="subtle" flexDirection="column" alignItems="center" justifyContent="center" textAlign="center" rounded="lg" p={6}>
             <AlertIcon boxSize="24px" mr={0} />
-            <Text mt={4} mb={2} fontWeight="bold">Transmission Sent</Text>
-            <Text fontSize="sm">Check your inbox for the reset link.</Text>
+            <Text mt={4} mb={2} fontWeight="bold">Reset link sent</Text>
+            <Text fontSize="sm">Check your email for instructions to reset your password.</Text>
           </Alert>
         ) : (
           <form onSubmit={handleReset}>
@@ -93,7 +91,7 @@ export default function ForgotPasswordPage() {
                     type="email" 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
-                    placeholder="pilot@company.com" 
+                    placeholder="you@company.com" 
                     borderColor={borderColor}
                     focusBorderColor="teal.400"
                     size="lg"

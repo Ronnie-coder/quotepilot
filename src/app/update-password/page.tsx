@@ -23,7 +23,7 @@ import {
   InputRightElement 
 } from '@chakra-ui/react';
 import NextLink from 'next/link';
-import Image from 'next/image'; // Added for Logo
+import Image from 'next/image';
 import { Eye, EyeOff } from 'lucide-react';
 import { AuthLayout } from '@/components/AuthLayout';
 
@@ -89,7 +89,7 @@ export default function UpdatePasswordPage() {
       toast({ title: 'Update Failed', description: error.message, status: 'error', duration: 5000, isClosable: true });
       setError(error.message);
     } else {
-      toast({ title: 'Credentials Secured', description: 'Your password has been updated. Redirecting...', status: 'success', duration: 4000, isClosable: true });
+      toast({ title: 'Password Updated', description: 'Your password has been updated successfully.', status: 'success', duration: 4000, isClosable: true });
       setTimeout(() => router.push('/dashboard'), 2000); // Redirect to dashboard, they are already logged in
     }
     setIsLoading(false);

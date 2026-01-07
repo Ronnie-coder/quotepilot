@@ -68,7 +68,6 @@ export default function SignInPage() {
   };
 
   // OAuth Logic
-  // COMMANDER FIX: Typed as 'any' to accept 'linkedin_oidc' without TS errors
   const handleOAuthSignIn = async (provider: any) => {
     setIsLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({ 
@@ -100,7 +99,7 @@ export default function SignInPage() {
              <Image src="/logo.svg" alt="QuotePilot" width={48} height={48} priority />
           </Box>
           <Heading fontSize="xl" textAlign="center" fontWeight="bold" color={useColorModeValue('gray.700', 'white')}>
-            Pilot Login
+            Sign in to QuotePilot
           </Heading>
         </VStack>
         
@@ -130,7 +129,6 @@ export default function SignInPage() {
             variant="outline" 
             borderColor={borderColor} 
             leftIcon={<Icon as={FaLinkedin} color="#0077b5" />} 
-            // COMMANDER CRITICAL FIX: Using 'linkedin_oidc'
             onClick={() => handleOAuthSignIn('linkedin_oidc')}
             fontSize="sm"
           >
@@ -175,7 +173,7 @@ export default function SignInPage() {
                 type="email" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
-                placeholder="commander@quotepilot.com" 
+                placeholder="you@company.com" 
                 borderColor={borderColor}
                 focusBorderColor="teal.400"
               />
@@ -211,7 +209,7 @@ export default function SignInPage() {
         </form>
         
         <Text mt={6} textAlign="center" fontSize="sm" color="gray.500">
-          New to the cockpit? <Link as={NextLink} href="/sign-up" color={tealColor} fontWeight="bold">Sign Up</Link>
+          New to QuotePilot? <Link as={NextLink} href="/sign-up" color={tealColor} fontWeight="bold">Sign Up</Link>
         </Text>
       </Box>
     </AuthLayout>

@@ -87,7 +87,6 @@ export default function SignUpPage() {
   };
 
   // OAuth Logic
-  // COMMANDER FIX: Typed as 'any' to accept 'linkedin_oidc'
   const handleOAuthSignIn = async (provider: any) => {
     setIsLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({ 
@@ -119,7 +118,7 @@ export default function SignUpPage() {
             <Image src="/logo.svg" alt="QuotePilot" width={48} height={48} priority />
           </Box>
           <Heading fontSize="xl" textAlign="center" fontWeight="bold" color={useColorModeValue('gray.700', 'white')}>
-            Join the Fleet
+            Create your account
           </Heading>
         </VStack>
 
@@ -151,7 +150,6 @@ export default function SignUpPage() {
             variant="outline" 
             borderColor={borderColor} 
             leftIcon={<Icon as={FaLinkedin} color="#0077b5" />} 
-            // COMMANDER CRITICAL FIX: 'linkedin_oidc'
             onClick={() => handleOAuthSignIn('linkedin_oidc')}
             fontSize="sm"
           >
@@ -175,7 +173,7 @@ export default function SignUpPage() {
             gridColumn="span 2"
             _hover={{ bg: useColorModeValue('gray.50', 'whiteAlpha.100') }}
           >
-            Sign up with Notion
+            Continue with Notion
           </Button>
         </SimpleGrid>
         
@@ -195,7 +193,7 @@ export default function SignUpPage() {
                 type="email" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
-                placeholder="pilot@quotepilot.com" 
+                placeholder="you@company.com" 
                 borderColor={borderColor}
                 focusBorderColor="teal.400" 
               />
@@ -227,7 +225,7 @@ export default function SignUpPage() {
         </form>
 
         <Text mt={6} textAlign="center" fontSize="sm" color="gray.500">
-          Already flying with us? <Link as={NextLink} href="/sign-in" color={tealColor} fontWeight="bold">Sign In</Link>
+          Already have an account? <Link as={NextLink} href="/sign-in" color={tealColor} fontWeight="bold">Sign In</Link>
         </Text>
       </Box>
     </AuthLayout>

@@ -5,12 +5,12 @@ export default function TermsOfServicePage() {
     <Container maxW="container.lg" py={12}>
       <VStack spacing={6} align="stretch">
         <Heading as="h1" size="2xl">Terms of Service</Heading>
-        <Text>Last Updated: {new Date().toLocaleDateString()}</Text>
+        <Text>Last updated: 15 January 2026</Text>
 
         <Heading as="h2" size="lg" mt={4}>1. Introduction</Heading>
         <Text>
           Welcome to QuotePilot (“we”, “us”, “our”). QuotePilot is a software service
-          owned and operated by CODERON. These Terms of Service (“Terms”)
+          owned and operated by Coderon (Pty) Ltd. These Terms of Service (“Terms”)
           govern your access to and use of the QuotePilot application located at
           https://quotepilot.coderon.co.za/ (the “Service”).
         </Text>
@@ -97,16 +97,15 @@ export default function TermsOfServicePage() {
         <Heading as="h2" size="lg" mt={4}>9. Changes to Terms</Heading>
         <Text>
           We may update or modify these Terms from time to time. Changes become effective
-          once posted on this page. We will attempt to provide advance notice for
+          once posted on this page. We will provide notice where reasonably possible for
           material changes.
         </Text>
 
         <Heading as="h2" size="lg" mt={4}>10. Contact Us</Heading>
         <Text>If you have questions about these Terms, please contact:</Text>
         <UnorderedList spacing={2} pl={6}>
-          <ListItem>Email (Support): support@coderon.co.za</ListItem>
-          <ListItem>Email (General): info@coderon.co.za</ListItem>
-          <ListItem>WhatsApp/Phone: 067 818 4898</ListItem>
+          <ListItem>Support email: support@coderon.co.za</ListItem>
+          <ListItem>General email: info@coderon.co.za</ListItem>
         </UnorderedList>
       </VStack>
     </Container>
