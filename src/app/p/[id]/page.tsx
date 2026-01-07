@@ -11,6 +11,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const supabase = await createSupabaseServerClient();
   const { id } = await params;
   
+  // 1. Fetch minimal data for metadata
   const { data: quote } = await supabase
     .from('quotes')
     .select('invoice_number, document_type, profiles(company_name)')
@@ -23,25 +24,47 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const profileData = Array.isArray(anyQuote.profiles) ? anyQuote.profiles[0] : anyQuote.profiles;
   const company = profileData?.company_name || 'Freelancer';
   
-  // 🟢 LOGIC: Distinguish between Invoice and Proposal (Quote)
+  // 2. LOGIC: Distinguish between Invoice and Proposal (Quote)
   const rawType = anyQuote.document_type || 'invoice';
   const isProposal = rawType.toLowerCase() === 'quote';
+  
   const displayType = isProposal ? 'Proposal' : 'Invoice';
   const number = anyQuote.invoice_number;
 
-  // 🟢 SAFETY: Ensure proposals have neutral metadata (No "Pay Securely" wording)
-  const metaTitle = `${displayType} #${number} from ${company}`;
-  const metaDescription = isProposal 
-    ? `View proposal from ${company}.`
-    : `Invoice from ${company}. Pay securely online.`;
+  // 3. BROWSER TITLE (Dynamic)
+  // We keep this specific so users can distinguish tabs in Chrome/Safari
+  const browserTitle = `${displayType} #${number} from ${company}`;
+
+  // 4. OG METADATA (Strict Static)
+  // We override this specifically for WhatsApp/LinkedIn to look clean and secure
+  const ogTitle = isProposal 
+    ? "Proposal via QuotePilot" 
+    : "Invoice via QuotePilot";
+
+  const ogDescription = isProposal 
+    ? "Review the proposal outlining the work and pricing." 
+    : "View the invoice and payment details.";
 
   return {
-    title: metaTitle,
-    description: metaDescription,
+    title: browserTitle,
     openGraph: {
-      title: metaTitle,
-      description: metaDescription, // Replaces generic "Secure Payment Link"
-      images: ['/og-image.png'], 
+      title: ogTitle,
+      description: ogDescription,
+      images: [
+        {
+          url: '/og-image.png',
+          width: 1200,
+          height: 630,
+          alt: 'QuotePilot Secure Document',
+        }
+      ],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: ogTitle,
+      description: ogDescription,
+      images: ['/og-image.png'],
     },
   };
 }
@@ -66,8 +89,7 @@ export default async function PublicQuotePage({ params }: PageProps) {
     return notFound();
   }
 
-  // 🟢 2. CRITICAL FIX: Fetch the User's Real Email from Auth Admin
-  // (The profiles table often doesn't have the email, but Auth does)
+  // 2. Fetch the User's Real Email from Auth Admin
   const { data: userData } = await supabase.auth.admin.getUserById(rawQuote.user_id);
   const realUserEmail = userData?.user?.email || "";
 
@@ -81,7 +103,6 @@ export default async function PublicQuotePage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center py-10 px-4">
-      {/* 🟢 PASS THE EMAIL PROP DOWN */}
       <PublicView quote={quote} userEmail={realUserEmail} />
     </div>
   );
