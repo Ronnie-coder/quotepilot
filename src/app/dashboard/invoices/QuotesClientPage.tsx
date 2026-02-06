@@ -2,18 +2,18 @@
 
 import {
   Box, Table, Thead, Tbody, Tr, Th, Td, Badge, IconButton, Menu, MenuButton, MenuList, MenuItem, Button, Flex, Text, useToast, Container, Input, InputGroup, InputLeftElement, Select, useColorModeValue, VStack, Icon,
-  AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay
+  AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay, Tooltip
 } from '@chakra-ui/react';
-import { MoreVertical, Search, FileText, Download, CheckCircle, Send, ExternalLink, FileQuestion, DollarSign, Trash2 } from 'lucide-react';
+import { MoreVertical, Search, FileText, Download, CheckCircle, Send, ExternalLink, FileQuestion, DollarSign, Trash2, ShieldCheck, Plus, Bell } from 'lucide-react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useState, useTransition, useCallback, useRef } from 'react';
 import { updateDocumentStatusAction, getQuoteForPdf, deleteQuoteAction } from './actions';
 import { generatePdf } from '@/utils/pdfGenerator';
 import ShareInvoice from '@/components/ShareInvoice';
+import InvoiceReminder from '@/components/InvoiceReminder'; 
 import { PaymentSettings } from '@/types/profile';
 
 // --- INTERNAL COMPONENT: DELETE DIALOG ---
-// We define this here to prevent file system/import crashes
 type DeleteQuoteDialogProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -35,8 +35,8 @@ function DeleteQuoteDialog({ isOpen, onClose, quoteId, clientName }: DeleteQuote
 
       if (result.success) {
         toast({
-          title: 'Document Deleted',
-          description: `The document for ${clientName} has been permanently removed.`,
+          title: 'Invoice Deleted',
+          description: `The invoice for ${clientName} has been permanently removed.`,
           status: 'success',
           duration: 3000,
         });
@@ -62,13 +62,13 @@ function DeleteQuoteDialog({ isOpen, onClose, quoteId, clientName }: DeleteQuote
       <AlertDialogOverlay bg="blackAlpha.300" backdropFilter="blur(2px)">
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold" color="red.600">
-            Confirm Deletion
+            Delete Invoice
           </AlertDialogHeader>
 
           <AlertDialogBody>
-            Are you sure you want to delete this document for <strong>{clientName}</strong>?
+            Are you sure you want to delete this invoice for <strong>{clientName}</strong>?
             <br /><br />
-            This action creates a permanent record gap and cannot be undone.
+            This action creates a permanent gap in your records and cannot be undone.
           </AlertDialogBody>
 
           <AlertDialogFooter>
@@ -101,7 +101,9 @@ interface Quote {
   document_type: string;
   currency: string;
   payment_link?: string;
+  invoice_hash?: string; 
   client_id?: string;
+  due_date?: string; 
   clients: {
     name: string;
     email?: string;
@@ -127,8 +129,9 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
   const toast = useToast();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // 🟢 STATE: Track which quote is being deleted
+  // State: Track which invoice is being deleted or reminded
   const [quoteToDelete, setQuoteToDelete] = useState<{ id: string, name: string } | null>(null);
+  const [reminderQuote, setReminderQuote] = useState<Quote | null>(null);
 
   // --- FILTER LOGIC ---
   const createQueryString = useCallback(
@@ -146,10 +149,6 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
 
   const handleSearch = (term: string) => {
     router.push(`${pathname}?${createQueryString('q', term)}`);
-  };
-
-  const handleFilterType = (type: string) => {
-    router.push(`${pathname}?${createQueryString('type', type)}`);
   };
 
   const handleFilterStatus = (status: string) => {
@@ -195,7 +194,7 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
       }
 
       const blob = await generatePdf({
-        documentType: (quote.document_type as 'Invoice' | 'Quote') || 'Quote',
+        documentType: 'Invoice',
         brandColor: quote.brand_color || '#319795', 
         invoiceNumber: quote.invoice_number,
         invoiceDate: quote.invoice_date || quote.created_at,
@@ -233,7 +232,7 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${quote.document_type}_${quote.invoice_number}.pdf`;
+      link.download = `Invoice_${quote.invoice_number}.pdf`;
       link.click();
       window.URL.revokeObjectURL(url);
       toast({ status: 'success', title: 'Downloaded' });
@@ -246,8 +245,6 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
   };
 
   const handleStatusUpdate = async (id: string, newStatus: string) => {
-    // We can't use startTransition here easily with async/await in the same scope, 
-    // so we just call the action directly. The router.refresh handles the UI update.
     const result = await updateDocumentStatusAction(id, newStatus);
     if (result.success) {
       toast({ title: 'Status Updated', status: 'success' });
@@ -266,18 +263,21 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
     }
   };
 
+  // Dark Mode Colors
   const bg = useColorModeValue('white', 'gray.800');
   const hoverBg = useColorModeValue('gray.50', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const tableHeaderBg = useColorModeValue('gray.50', 'gray.900');
+  const textColor = useColorModeValue('gray.800', 'white');
 
   return (
     <Container maxW="container.xl" py={8}>
       <Flex justify="space-between" align="center" mb={6} direction={{ base: 'column', md: 'row' }} gap={4}>
         <Box>
-            <Text fontSize="2xl" fontWeight="bold">Documents</Text>
-            <Text color="gray.500">Track payments and manage client agreements.</Text>
+            <Text fontSize="2xl" fontWeight="bold" color={textColor}>Invoices</Text>
+            <Text color="gray.500">Track payments and manage client billing.</Text>
         </Box>
-        <Button leftIcon={<Icon as={FileText} />} colorScheme="teal" onClick={() => router.push('/quote/new')}>Create Document</Button>
+        <Button leftIcon={<Plus size={20} />} colorScheme="brand" onClick={() => router.push('/dashboard/invoices/new')}>Create Invoice</Button>
       </Flex>
 
       {/* FILTER TOOLBAR */}
@@ -294,16 +294,6 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
             
             <Select 
                 maxW={{ base: 'full', md: '200px' }} 
-                placeholder="All Types" 
-                defaultValue={searchParams.get('type')?.toString()}
-                onChange={(e) => handleFilterType(e.target.value)}
-            >
-                <option value="Invoice">Invoices</option>
-                <option value="Quote">Quotes</option>
-            </Select>
-
-            <Select 
-                maxW={{ base: 'full', md: '200px' }} 
                 placeholder="All Statuses" 
                 defaultValue={searchParams.get('status')?.toString()}
                 onChange={(e) => handleFilterStatus(e.target.value)}
@@ -316,61 +306,45 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
         </Flex>
       </Box>
 
-      {/* DOCUMENT TABLE */}
+      {/* INVOICE TABLE */}
       <Box bg={bg} borderRadius="lg" borderWidth="1px" borderColor={borderColor} overflowX="auto" shadow="sm">
         <Table variant="simple">
-          <Thead bg={useColorModeValue('gray.50', 'gray.700')}>
+          <Thead bg={tableHeaderBg}>
             <Tr>
-                <Th w="50px">Type</Th>
-                <Th>Number</Th>
-                <Th>Client</Th>
-                <Th>Status</Th>
-                <Th>Date</Th>
-                <Th isNumeric>Amount</Th>
-                <Th isNumeric>Actions</Th>
+                <Th color="gray.500">Number</Th>
+                <Th color="gray.500">Client</Th>
+                <Th color="gray.500">Status</Th>
+                <Th color="gray.500">Date</Th>
+                <Th isNumeric color="gray.500">Amount</Th>
+                <Th isNumeric color="gray.500">Actions</Th>
             </Tr>
           </Thead>
           <Tbody>
             {documents && documents.length > 0 ? (
               documents.map((doc) => {
-                const isInvoice = doc.document_type?.toLowerCase() === 'invoice';
-                const isPaid = doc.status?.toLowerCase() === 'paid';
-                const docType = isInvoice ? 'invoice' : 'quote';
-
-                let IconComp = FileText;
-                let colorScheme = 'purple';
-
-                if (isInvoice) {
-                    if (isPaid) {
-                        IconComp = DollarSign;
-                        colorScheme = 'green';
-                    } else {
-                        IconComp = FileText;
-                        colorScheme = 'blue';
-                    }
-                } else {
-                    IconComp = FileText;
-                    colorScheme = 'purple';
-                }
+                const isVerified = !!doc.invoice_hash;
+                const canRemind = ['sent', 'overdue'].includes(doc.status?.toLowerCase());
 
                 return (
                     <Tr 
                     key={doc.id} 
                     _hover={{ bg: hoverBg, cursor: 'pointer' }}
-                    onClick={() => router.push(`/quote/${doc.id}`)}
+                    onClick={() => router.push(`/dashboard/invoices/${doc.id}`)}
                     transition="background-color 0.2s"
                     >
-                    <Td>
-                        <Box p={2} bg={`${colorScheme}.50`} borderRadius="md" color={`${colorScheme}.500`} w="fit-content">
-                            <Icon as={IconComp} boxSize={4} />
-                        </Box>
-                    </Td>
-                    <Td fontWeight="bold" fontSize="sm">
-                        #{doc.invoice_number}
+                    <Td fontWeight="bold" fontSize="sm" color={textColor}>
+                        <Flex align="center" gap={2}>
+                            #{doc.invoice_number}
+                            {isVerified && (
+                                <Tooltip label="Verified on Blockchain">
+                                    <Icon as={ShieldCheck} size={14} color="green.500" />
+                                </Tooltip>
+                            )}
+                        </Flex>
                     </Td>
                     
                     <Td 
-                        color="blue.400" 
+                        color="brand.500" 
                         fontWeight="bold"
                         cursor="pointer"
                         onClick={(e) => {
@@ -379,17 +353,14 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
                               router.push(`/dashboard/clients/${doc.client_id}`);
                           }
                         }}
-                        _hover={{ textDecoration: 'underline', color: 'blue.300' }}
+                        _hover={{ textDecoration: 'underline' }}
                     >
-                        <Flex align="center" gap={2}>
-                          {doc.clients?.name}
-                          <ExternalLink size={14} />
-                        </Flex>
+                        {doc.clients?.name}
                     </Td>
 
                     <Td><Badge colorScheme={getStatusColor(doc.status)}>{doc.status}</Badge></Td>
-                    <Td fontSize="sm" color="gray.600">{new Date(doc.created_at).toLocaleDateString('en-GB')}</Td>
-                    <Td isNumeric fontWeight="bold" fontFamily="mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: doc.currency || 'USD' }).format(doc.total || 0)}</Td>
+                    <Td fontSize="sm" color="gray.500">{new Date(doc.created_at).toLocaleDateString('en-GB')}</Td>
+                    <Td isNumeric fontWeight="bold" fontFamily="mono" color={textColor}>{new Intl.NumberFormat('en-US', { style: 'currency', currency: doc.currency || 'USD' }).format(doc.total || 0)}</Td>
                     <Td isNumeric onClick={(e) => e.stopPropagation()}>
                         <Flex justify="flex-end" gap={2}>
                             <ShareInvoice 
@@ -399,25 +370,33 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
                               clientEmail={doc.clients?.email} 
                               isIconOnly={true} 
                               businessName={getBusinessName(doc)}
-                              type={docType}
+                              type="invoice"
                               paymentLink={getActivePaymentLink(doc)}
+                              currency={doc.currency} // ✅ ADDED: Ensures ShareInvoice receives the correct currency prop
                             />
                             
                             <Menu isLazy>
                                 <MenuButton as={IconButton} icon={<MoreVertical size={16} />} variant="ghost" size="sm" isLoading={downloadingId === doc.id} />
                                 <MenuList>
-                                    <MenuItem icon={<FileText size={16} />} onClick={() => router.push(`/quote/${doc.id}`)}>Edit / View</MenuItem>
+                                    <MenuItem icon={<FileText size={16} />} onClick={() => router.push(`/dashboard/invoices/${doc.id}`)}>Edit / View</MenuItem>
+                                    
+                                    {/* 🟢 REMINDER BUTTON (Fixed: Sets state instead of unmounting) */}
+                                    {canRemind && (
+                                       <MenuItem icon={<Bell size={16} />} onClick={() => setReminderQuote(doc)}>
+                                         Send Reminder
+                                       </MenuItem>
+                                    )}
+
                                     <MenuItem icon={<Download size={16} />} onClick={() => handleDownload(doc.id)}>Download PDF</MenuItem>
                                     <MenuItem icon={<CheckCircle size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Paid')}>Mark as Paid</MenuItem>
                                     <MenuItem icon={<Send size={16} />} onClick={() => handleStatusUpdate(doc.id, 'Sent')}>Mark as Sent</MenuItem>
                                     
-                                    {/* 🟢 ACTION: Trigger Modal State */}
                                     <MenuItem 
                                         icon={<Trash2 size={16} />} 
                                         color="red.500" 
                                         onClick={(e) => {
                                             e.stopPropagation(); 
-                                            setQuoteToDelete({ id: doc.id, name: doc.clients?.name || 'this document' });
+                                            setQuoteToDelete({ id: doc.id, name: doc.clients?.name || 'this invoice' });
                                         }}
                                     >
                                         Delete
@@ -431,14 +410,14 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
               })
             ) : (
                 <Tr>
-                    <Td colSpan={7} h="300px" textAlign="center">
+                    <Td colSpan={6} h="300px" textAlign="center">
                         <VStack spacing={4} justify="center" h="full">
                             <Box p={4} bg="gray.50" rounded="full">
                                 <Icon as={FileQuestion} boxSize={8} color="gray.400" />
                             </Box>
-                            <Text fontSize="lg" fontWeight="medium" color="gray.600">No documents found</Text>
-                            <Text color="gray.400" fontSize="sm">Try adjusting your filters or create a new one.</Text>
-                            <Button size="sm" colorScheme="teal" onClick={() => router.push('/quote/new')}>Create Document</Button>
+                            <Text fontSize="lg" fontWeight="medium" color="gray.600">No invoices found</Text>
+                            <Text color="gray.400" fontSize="sm">Create your first invoice to get started.</Text>
+                            <Button size="sm" colorScheme="brand" onClick={() => router.push('/dashboard/invoices/new')}>Create Invoice</Button>
                         </VStack>
                     </Td>
                 </Tr>
@@ -447,13 +426,28 @@ export default function QuotesClientPage({ documents, count, page, limit }: Prop
         </Table>
       </Box>
 
-      {/* 🟢 DIALOG: RENDERED INTERNALLY */}
+      {/* DELETE DIALOG */}
       <DeleteQuoteDialog 
         isOpen={!!quoteToDelete} 
         onClose={() => setQuoteToDelete(null)} 
         quoteId={quoteToDelete?.id || null} 
         clientName={quoteToDelete?.name || ''} 
       />
+
+      {/* 🟢 REMINDER MODAL (Now sits outside the table/menu) */}
+      {reminderQuote && (
+        <InvoiceReminder
+          isOpen={!!reminderQuote}
+          onClose={() => setReminderQuote(null)}
+          quoteId={reminderQuote.id}
+          invoiceNumber={reminderQuote.invoice_number}
+          clientName={reminderQuote.clients?.name}
+          amount={new Intl.NumberFormat('en-US', { style: 'currency', currency: reminderQuote.currency || 'USD' }).format(reminderQuote.total || 0)}
+          dueDate={reminderQuote.due_date || new Date().toISOString()}
+          clientEmail={reminderQuote.clients?.email}
+          paymentLink={getActivePaymentLink(reminderQuote)}
+        />
+      )}
 
     </Container>
   );

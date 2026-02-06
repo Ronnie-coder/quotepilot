@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { IconButton, useToast, Icon } from '@chakra-ui/react';
 import { Download, Loader2 } from 'lucide-react';
-import { getQuoteForPdf } from '@/app/dashboard/quotes/actions';
+// ✅ FIXED: Updated import path from 'quotes' to 'invoices'
+import { getQuoteForPdf } from '@/app/dashboard/invoices/actions';
 import { generatePdf } from '@/utils/pdfGenerator';
-import { mapToPdfPayload } from '@/utils/pdfMapper'; // 🟢 IMPORT MAPPER
+import { mapToPdfPayload } from '@/utils/pdfMapper'; 
 
 export default function DownloadInvoiceButton({ quoteId }: { quoteId: string }) {
   const [loading, setLoading] = useState(false);

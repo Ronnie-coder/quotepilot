@@ -13,17 +13,18 @@ import {
   Text,
   VStack,
   HStack,
-  useDisclosure,
   useToast,
   Icon,
   useColorModeValue
 } from '@chakra-ui/react';
 import { FaWhatsapp } from 'react-icons/fa';
 import { FiMail, FiBell } from 'react-icons/fi';
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { sendInvoiceEmail } from '@/app/actions/sendInvoiceEmail';
 
 interface InvoiceReminderProps {
+  isOpen: boolean;
+  onClose: () => void;
   quoteId: string;
   invoiceNumber: string;
   clientName: string;
@@ -34,15 +35,16 @@ interface InvoiceReminderProps {
 }
 
 export default function InvoiceReminder({
+  isOpen,
+  onClose,
   quoteId,
   invoiceNumber,
   clientName,
   amount,
   dueDate,
   clientEmail,
-  paymentLink
+  paymentLink,
 }: InvoiceReminderProps) {
-  const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState('');
@@ -56,27 +58,29 @@ export default function InvoiceReminder({
   const warningBg = useColorModeValue('orange.50', 'rgba(237, 137, 54, 0.1)');
   const warningText = useColorModeValue('orange.700', 'orange.200');
 
-  const handleOpen = () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const viewLink = `${origin}/p/${quoteId}`;
+  // Generate Message on Open
+  useEffect(() => {
+    if (isOpen) {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const viewLink = `${origin}/p/${quoteId}`;
+        
+        // Payment Logic
+        let paymentSection = "";
+        if (paymentLink) {
+          paymentSection = `Pay securely online:\n${paymentLink}`;
+        } else {
+          const fallbackLink = `${origin}/p/${quoteId}?action=pay`;
+          paymentSection = `View payment details:\n${fallbackLink}`;
+        }
+        
+        // Date Logic
+        let formattedDate = dueDate;
+        try {
+          formattedDate = new Date(dueDate).toLocaleDateString();
+        } catch (e) { /* ignore */ }
     
-    // Payment Logic
-    let paymentSection = "";
-    if (paymentLink) {
-      paymentSection = `Pay securely online:\n${paymentLink}`;
-    } else {
-      const fallbackLink = `${origin}/p/${quoteId}?action=pay`;
-      paymentSection = `View payment details:\n${fallbackLink}`;
-    }
-    
-    // Date Logic
-    let formattedDate = dueDate;
-    try {
-      formattedDate = new Date(dueDate).toLocaleDateString();
-    } catch (e) { /* ignore */ }
-
-    // REMINDER TEMPLATE (Short, Direct, No Emojis)
-    const template = `Hi ${clientName},
+        // REMINDER TEMPLATE
+        const template = `Hi ${clientName},
 
 This is a reminder that invoice ${invoiceNumber} for ${amount} was due on ${formattedDate}.
 
@@ -86,10 +90,10 @@ ${viewLink}
 ${paymentSection}
 
 Thank you.`;
-    
-    setMessage(template);
-    onOpen();
-  };
+        
+        setMessage(template);
+    }
+  }, [isOpen, quoteId, invoiceNumber, clientName, amount, dueDate, paymentLink]);
 
   const handleWhatsApp = () => {
     if (!message.trim()) return;
@@ -127,78 +131,66 @@ Thank you.`;
   };
 
   return (
-    <>
-      <Button 
-        leftIcon={<Icon as={FiBell} />} 
-        variant="ghost" 
-        colorScheme="orange"
-        size="md"
-        onClick={handleOpen}
-      >
-        Remind
-      </Button>
+    <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>Send Invoice Reminder</ModalHeader>
+        <ModalCloseButton />
+        
+        <ModalBody>
+          <VStack spacing={4} align="stretch">
+            <Text fontSize="sm" color={helperTextColor}>
+              Review the message below.
+            </Text>
+            
+            <Textarea 
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              minHeight="240px" 
+              size="sm"
+              bg={textareaBg}
+              color={textareaTextColor}
+              borderColor={textareaBorder}
+              _focus={{ borderColor: 'orange.400' }}
+              fontFamily="monospace"
+            />
 
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Send Invoice Reminder</ModalHeader>
-          <ModalCloseButton />
-          
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
-              <Text fontSize="sm" color={helperTextColor}>
-                Review the message below.
-              </Text>
-              
-              <Textarea 
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                minHeight="240px" 
-                size="sm"
-                bg={textareaBg}
-                color={textareaTextColor}
-                borderColor={textareaBorder}
-                _focus={{ borderColor: 'orange.400' }}
-                fontFamily="monospace"
-              />
+            {!clientEmail && (
+              <HStack bg={warningBg} p={2} borderRadius="md">
+                <Icon as={FiBell} color="orange.500" />
+                <Text fontSize="xs" color={warningText}>
+                  This client does not have an email address saved.
+                </Text>
+              </HStack>
+            )}
+          </VStack>
+        </ModalBody>
 
-              {!clientEmail && (
-                <HStack bg={warningBg} p={2} borderRadius="md">
-                  <Icon as={FiBell} color="orange.500" />
-                  <Text fontSize="xs" color={warningText}>
-                    This client does not have an email address saved.
-                  </Text>
-                </HStack>
-              )}
-            </VStack>
-          </ModalBody>
-
-          <ModalFooter bg={footerBg} borderBottomRadius="md">
-            <HStack spacing={3} width="100%">
-              <Button 
-                leftIcon={<FaWhatsapp />} 
-                colorScheme="green" 
-                onClick={handleWhatsApp}
-                flex={1}
-              >
-                Open WhatsApp
-              </Button>
-              
-              <Button 
-                leftIcon={<FiMail />} 
-                colorScheme="blue" 
-                onClick={handleEmail}
-                isLoading={isPending}
-                isDisabled={!clientEmail}
-                variant="outline"
-                flex={1}
-              >
-                Send Email
-              </Button>
-            </HStack>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </>
+        <ModalFooter bg={footerBg} borderBottomRadius="md">
+          <HStack spacing={3} width="100%">
+            <Button 
+              leftIcon={<FaWhatsapp />} 
+              colorScheme="green" 
+              onClick={handleWhatsApp}
+              flex={1}
+            >
+              Open WhatsApp
+            </Button>
+            
+            <Button 
+              leftIcon={<FiMail />} 
+              colorScheme="blue" 
+              onClick={handleEmail}
+              isLoading={isPending}
+              isDisabled={!clientEmail}
+              variant="outline"
+              flex={1}
+            >
+              Send Email
+            </Button>
+          </HStack>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }

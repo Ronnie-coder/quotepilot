@@ -8,9 +8,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function BackToTop() {
   const [isVisible, setIsVisible] = useState(false);
   
-  // Colors
+  // 🟢 FIX: Ensure colors are extremely explicit for both modes
+  // Light: Teal 600, Dark: Teal 400
   const bg = useColorModeValue('teal.600', 'teal.400');
   const hoverBg = useColorModeValue('teal.700', 'teal.300');
+  const arrowColor = useColorModeValue('white', 'gray.900');
 
   const toggleVisibility = () => {
     if (window.scrollY > 100) {
@@ -43,18 +45,17 @@ export default function BackToTop() {
             position: 'fixed', 
             bottom: '2rem', 
             right: '2rem', 
-            zIndex: 9999 
+            zIndex: 9999 // 🟢 FIX: Ensure it floats above everything
           }}
         >
           <IconButton
             aria-label="Back to top"
             icon={<ArrowUp size={24} />}
             onClick={scrollToTop}
-            // 🟢 FIX 1: Explicitly force 'solid' variant
-            variant="solid" 
-            // 🟢 FIX 2: Ensure background color is applied
+            variant="solid"
+            colorScheme="teal" // 🟢 FIX: Fallback color scheme
             bg={bg}
-            color="white"
+            color={arrowColor}
             size="lg"
             isRound
             shadow="xl"

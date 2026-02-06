@@ -13,8 +13,6 @@ import {
   HStack,
   IconButton,
   Text,
-  Switch,
-  Grid,
   useToast,
   Textarea,
   Select,
@@ -25,20 +23,31 @@ import {
   useColorModeValue,
   InputGroup,
   InputLeftElement,
+  Flex,
+  Badge,
+  Card,
+  CardBody,
+  StackDivider,
+  ButtonGroup,
+  Alert,
+  AlertIcon
 } from '@chakra-ui/react';
-import { Trash2, Plus, Save, Download } from 'lucide-react';
+import { 
+  Trash2, Plus, Save, Download, 
+  ArrowRight, ArrowLeft, CheckCircle2, 
+  User, List, Settings, FileCheck, Send, Wallet
+} from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'; 
 import { Database } from '@/types/supabase';
 import { PaymentSettings } from '@/types/profile'; 
 import { InvoiceFormData } from '@/types/invoice';
-import { createQuoteAction, updateQuoteAction } from '@/app/dashboard/quotes/actions';
+import { createQuoteAction, updateQuoteAction } from '@/app/dashboard/invoices/actions';
 import { generatePdf } from '@/utils/pdfGenerator'; 
 import PaymentMethodSelector from './PaymentMethodSelector';
 
-// Local type helper
+// --- TYPES ---
 type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 
-// Extended Types
 type ExtendedClient = Tables<'clients'> & { 
   currency?: string | null; 
   phone?: string | null; 
@@ -59,8 +68,8 @@ type ExtendedProfile = Tables<'profiles'> & {
     company_address?: string | null;
     company_phone?: string | null; 
     terms_conditions?: string | null;
-    proposal_default_notes?: string | null; // 🟢 ADDED: New Column Support
     payment_settings?: PaymentSettings | null; 
+    wallet_address?: string | null;
 };
 
 type InvoiceFormProps = {
@@ -69,52 +78,103 @@ type InvoiceFormProps = {
   defaultValues?: Tables<'quotes'> & { payment_link?: string | null } | null;
 };
 
-const FormSection = ({ title, children }: { title: string, children: React.ReactNode }) => {
-  const cardBg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const headingColor = useColorModeValue('gray.700', 'white');
+// --- WIZARD COMPONENTS ---
+
+const WizardProgress = ({ currentStep }: { currentStep: number }) => {
+  const steps = [
+    { icon: User, label: 'Client' },
+    { icon: List, label: 'Items' }, // 🟢 COPY UPDATE: Work -> Items
+    { icon: Settings, label: 'Payment' },
+    { icon: FileCheck, label: 'Review' }
+  ];
+
+  const barBg = useColorModeValue('gray.200', 'gray.700');
+  const bgActive = useColorModeValue('brand.500', 'brand.400');
+  const bgInactive = useColorModeValue('white', 'gray.800');
+  const bgCompleted = useColorModeValue('brand.50', 'brand.900');
 
   return (
-    <Box bg={cardBg} p={{ base: 5, md: 6 }} borderRadius="lg" shadow="md" borderWidth="1px" borderColor={borderColor}>
-      <Heading as="h3" size="md" mb={6} color={headingColor}>{title}</Heading>
-      <VStack spacing={5} align="stretch">{children}</VStack>
+    <Box mb={8}>
+      <Flex justify="space-between" align="center" position="relative">
+        <Box position="absolute" top="16px" left="0" right="0" h="2px" bg={barBg} zIndex={0} />
+        {steps.map((step, index) => {
+          const isCompleted = index < currentStep;
+          const isCurrent = index === currentStep;
+          const color = isCompleted || isCurrent ? 'brand.500' : 'gray.400';
+          const bg = isCurrent ? bgActive : (isCompleted ? bgCompleted : bgInactive);
+          const iconColor = isCurrent ? 'white' : (isCompleted ? 'brand.500' : 'gray.400');
+          const borderColor = isCompleted || isCurrent ? 'brand.500' : 'gray.300';
+
+          return (
+            <VStack key={index} zIndex={1} spacing={2} bg="transparent">
+              <Flex 
+                align="center" justify="center" 
+                w={8} h={8} rounded="full" 
+                bg={bg} border="2px solid" borderColor={borderColor}
+                transition="all 0.3s"
+              >
+                {isCompleted ? <Icon as={CheckCircle2} size={16} color="brand.500" /> : <Icon as={step.icon} size={14} color={iconColor} />}
+              </Flex>
+              <Text fontSize="xs" fontWeight="bold" color={isCurrent ? 'brand.500' : 'gray.500'}>{step.label}</Text>
+            </VStack>
+          );
+        })}
+      </Flex>
     </Box>
   );
 };
 
-export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProps) => {
+const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProps) => {
   const supabase = createSupabaseBrowserClient();
+  const toast = useToast();
   
-  // Initialize State
-  const initialDocType = defaultValues?.document_type === 'Invoice' ? 'Invoice' : 'Quote';
-  const [documentType, setDocumentType] = useState<'Quote' | 'Invoice'>(initialDocType);
-  
+  // --- STATE ---
+  const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isNewClient, setIsNewClient] = useState(!defaultValues?.client_id && clients?.length > 0);
   const [senderEmail, setSenderEmail] = useState(profile?.email || '');
-
   const [activeCurrency, setActiveCurrency] = useState((defaultValues as any)?.currency || profile?.currency || 'ZAR');
   const [selectedPaymentLink, setSelectedPaymentLink] = useState<string | null>(null);
 
-  const toast = useToast();
   const isEditing = !!defaultValues;
+  const documentType = 'Invoice';
 
-  const { register, control, handleSubmit, watch, reset, getValues, setValue } = useForm<InvoiceFormData>({
+  // --- DARK MODE COLORS ---
+  const inputBg = useColorModeValue('white', 'gray.700');
+  const inputBorder = useColorModeValue('gray.200', 'gray.600');
+  const cardBg = useColorModeValue('white', 'gray.800');
+  const cardBorder = useColorModeValue('gray.200', 'gray.700');
+  const focusColor = useColorModeValue('brand.500', 'brand.300');
+  const infoBoxBg = useColorModeValue('gray.50', 'whiteAlpha.100');
+  const infoBoxBorder = useColorModeValue('gray.200', 'whiteAlpha.200');
+  const reviewBoxBg = useColorModeValue('gray.50', 'gray.700');
+  const textColor = useColorModeValue('gray.800', 'white');
+
+  // --- FORM ---
+  const { register, control, handleSubmit, watch, reset, getValues, setValue, trigger } = useForm<InvoiceFormData>({
     defaultValues: { 
-      applyVat: defaultValues ? (defaultValues.vat_rate || 0) > 0 : true,
+      applyVat: defaultValues ? (defaultValues.vat_rate || 0) > 0 : false,
       brandColor: (defaultValues as any)?.brand_color || '#319795', 
       vatRate: 15
     }
   });
-  
+
   const watchedLineItems = watch('lineItems');
   const watchedVatRate = watch('vatRate');
   const applyVat = watch('applyVat');
-  const watchedBrandColor = watch('brandColor');
   const watchedClientName = watch('to.name'); 
 
-  // --- 1. USER EMAIL FETCH ---
+  // --- CALCULATIONS ---
+  const { subtotal, vatAmount, total } = useMemo(() => {
+    const sub = watchedLineItems?.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0) || 0;
+    const vat = applyVat ? sub * ((Number(watchedVatRate) || 0) / 100) : 0;
+    return { subtotal: sub, vatAmount: vat, total: sub + vat };
+  }, [watchedLineItems, watchedVatRate, applyVat]);
+
+  const { fields, append, remove } = useFieldArray({ control, name: 'lineItems' });
+
+  // --- EFFECTS ---
   useEffect(() => {
     if (!senderEmail) {
       const getEmail = async () => {
@@ -125,112 +185,85 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     }
   }, [senderEmail, supabase]);
 
-  // --- 2. CURRENCY SYNC ---
   useEffect(() => {
     if (isEditing && (defaultValues as any)?.currency) return;
-
     if (isNewClient) {
       setActiveCurrency(profile?.currency || 'ZAR');
     } else {
       const selectedClient = clients.find(c => c.name === watchedClientName);
-      if (selectedClient && selectedClient.currency) {
-        setActiveCurrency(selectedClient.currency);
-      } else {
-        setActiveCurrency(profile?.currency || 'ZAR');
-      }
+      if (selectedClient?.currency) setActiveCurrency(selectedClient.currency);
+      else setActiveCurrency(profile?.currency || 'ZAR');
     }
   }, [watchedClientName, isNewClient, clients, profile, isEditing, defaultValues]);
 
-  // --- 3. FORM INITIALIZATION ---
   useEffect(() => {
     if (defaultValues) {
-      // EDIT MODE
       const client = clients.find(c => c.id === defaultValues.client_id);
       const safeDateSource = defaultValues.invoice_date || defaultValues.created_at;
-      const invoiceDate = new Date(safeDateSource || new Date()).toISOString().substring(0, 10);
-      const savedColor = (defaultValues as any).brand_color || '#319795';
-
       reset({
         invoiceNumber: defaultValues.invoice_number || '',
-        invoiceDate: invoiceDate,
+        invoiceDate: new Date(safeDateSource || new Date()).toISOString().substring(0, 10),
         dueDate: defaultValues.due_date ? new Date(defaultValues.due_date).toISOString().substring(0, 10) : '',
         to: { name: client?.name || 'Client Not Found', email: client?.email || '', address: client?.address || '' },
         lineItems: defaultValues.line_items ? (defaultValues.line_items as any) : [{ description: '', quantity: 1, unitPrice: 0 }],
-        notes: defaultValues.notes || '', // Keep saved notes as is
+        notes: defaultValues.notes || profile?.terms_conditions || '',
         vatRate: defaultValues.vat_rate || 15,
         applyVat: (defaultValues.vat_rate || 0) > 0,
-        brandColor: savedColor,
+        brandColor: (defaultValues as any).brand_color || '#319795',
       });
       if(client) setIsNewClient(false);
-      
       if((defaultValues as any).currency) setActiveCurrency((defaultValues as any).currency);
       if (defaultValues.payment_link) setSelectedPaymentLink(defaultValues.payment_link);
-
     } else {
-      // CREATE MODE - 🟢 SMART DEFAULT NOTES
-      // If starting as 'Quote', grab proposal defaults. If 'Invoice', grab invoice defaults.
-      const initialNotes = initialDocType === 'Quote' 
-        ? (profile?.proposal_default_notes || '') 
-        : (profile?.terms_conditions || '');
-
       reset({
         to: { name: '', address: '', email: '' },
         lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
-        notes: initialNotes,
+        notes: profile?.terms_conditions || '',
         vatRate: 15,
-        applyVat: true,
+        applyVat: false,
         invoiceDate: new Date().toISOString().substring(0, 10),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10),
         brandColor: '#319795',
       });
       setActiveCurrency(profile?.currency || 'ZAR');
-      
-      // Auto-select payment link only for new invoices
       if (profile?.payment_settings?.default_provider) {
         const defId = profile.payment_settings.default_provider;
         const defProvider = profile.payment_settings.providers.find(p => p.id === defId);
         if (defProvider?.url) setSelectedPaymentLink(defProvider.url);
       }
     }
-  }, [defaultValues, clients, profile, reset, initialDocType]);
-  
-  // --- 4. HANDLE DOCUMENT TYPE TOGGLE ---
-  const handleDocTypeChange = (isInvoice: boolean) => {
-    const newType = isInvoice ? 'Invoice' : 'Quote';
-    setDocumentType(newType);
-
-    // 🟢 AUTO-SWITCH NOTES LOGIC
-    // We only swap if the field is empty OR matches the other default (prevent overwriting custom text)
-    // For simplicity in this handover, we force the swap to ensure the user sees the new terms.
-    if (newType === 'Quote') {
-        setValue('notes', profile?.proposal_default_notes || '');
-    } else {
-        setValue('notes', profile?.terms_conditions || '');
-    }
-  };
-
-  const { subtotal, vatAmount, total } = useMemo(() => {
-    const sub = watchedLineItems?.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0) || 0;
-    const vat = applyVat ? sub * ((Number(watchedVatRate) || 0) / 100) : 0;
-    return { subtotal: sub, vatAmount: vat, total: sub + vat };
-  }, [watchedLineItems, watchedVatRate, applyVat]);
-
-  const { fields, append, remove } = useFieldArray({ control, name: 'lineItems' });
+  }, [defaultValues, clients, profile, reset]);
 
   const formatMoney = (amount: number) => {
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: activeCurrency,
-      }).format(amount);
-    } catch {
-      return `${activeCurrency} ${amount.toFixed(2)}`;
-    }
+    try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: activeCurrency }).format(amount); }
+    catch { return `${activeCurrency} ${amount.toFixed(2)}`; }
   };
 
   const getCurrencySymbol = (code: string) => {
-    try {
-        return (0).toLocaleString('en-US', { style: 'currency', currency: code }).replace(/\d|\.|,/g, '').trim();
-    } catch { return code; }
+    try { return (0).toLocaleString('en-US', { style: 'currency', currency: code }).replace(/\d|\.|,/g, '').trim(); }
+    catch { return code; }
+  };
+
+  const handleNext = async () => {
+    let isValid = false;
+    if (step === 0) isValid = await trigger(['to.name', 'to.email']);
+    else if (step === 1) {
+      isValid = await trigger(['lineItems']);
+      if (watchedLineItems.length === 0 || !watchedLineItems[0].description) {
+        toast({ title: "Add at least one item", status: "warning" });
+        isValid = false;
+      }
+    } else if (step === 2) isValid = await trigger(['invoiceNumber', 'invoiceDate', 'dueDate']);
+    
+    if (isValid) {
+      setStep((prev) => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleBack = () => {
+    setStep((prev) => prev - 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDownloadPdf = async () => {
@@ -261,38 +294,21 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
         signature: profile?.signature_url || undefined, 
         currency: activeCurrency, 
         paymentLink: selectedPaymentLink, 
-        from: {
-          name: safeProfile.name,
-          email: safeProfile.email,
-          address: safeProfile.address,
-          phone: safeProfile.phone, 
-        },
-        to: {
-            ...formData.to,
-            phone: selectedClient?.phone ?? null,
-        },
-        lineItems: formData.lineItems.map(item => ({
-            description: item.description,
-            quantity: Number(item.quantity),
-            unitPrice: Number(item.unitPrice)
-        })),
+        from: { name: safeProfile.name, email: safeProfile.email, address: safeProfile.address, phone: safeProfile.phone },
+        to: { ...formData.to, phone: selectedClient?.phone ?? null },
+        lineItems: formData.lineItems.map(item => ({ description: item.description, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice) })),
         notes: formData.notes,
         vatRate: applyVat ? Number(watchedVatRate) : 0,
         subtotal,
         vatAmount,
         total,
-        payment: {
-            bankName: safeProfile.bankName,
-            accountHolder: safeProfile.accountHolder,
-            accNumber: safeProfile.accNumber,
-            branchCode: safeProfile.branchCode,
-        }
+        payment: { bankName: safeProfile.bankName, accountHolder: safeProfile.accountHolder, accNumber: safeProfile.accNumber, branchCode: safeProfile.branchCode }
       });
 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${documentType}_${formData.invoiceNumber || 'Draft'}.pdf`;
+      link.download = `Invoice_${formData.invoiceNumber || 'Draft'}.pdf`;
       link.click();
       window.URL.revokeObjectURL(url);
       toast({ status: 'success', title: 'PDF Downloaded' });
@@ -304,7 +320,7 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
     }
   };
 
-  const onSubmit = async (data: InvoiceFormData) => {
+  const onSubmit = async (data: InvoiceFormData, status: 'Draft' | 'Sent') => {
     setIsSubmitting(true);
     try {
       const payload = { 
@@ -314,211 +330,262 @@ export const InvoiceForm = ({ profile, clients, defaultValues }: InvoiceFormProp
       };
 
       if (isEditing && defaultValues) {
-        await updateQuoteAction({
-          quoteId: defaultValues.id, formData: payload, documentType: documentType, total: total,
-        });
+        await updateQuoteAction({ quoteId: defaultValues.id, formData: payload, documentType, total, status });
       } else {
-        await createQuoteAction({
-          formData: payload, documentType: documentType, total: total,
-        });
+        await createQuoteAction({ formData: payload, documentType, total, status });
       }
-      toast({ title: 'Success!', description: `Your ${documentType} has been saved.`, status: 'success', duration: 3000, isClosable: true });
+      toast({ title: status === 'Draft' ? 'Draft Saved!' : 'Invoice Issued!', status: 'success', duration: 3000, isClosable: true });
     } catch (error: any) {
       if (error.message === 'NEXT_REDIRECT' || error.digest?.includes('NEXT_REDIRECT')) return;
-      toast({ title: 'Operation Failed', description: error.message, status: 'error' });
+      toast({ title: 'Error', description: error.message, status: 'error' });
     } finally {
       setIsSubmitting(false);
     }
   };
-  
-  const primaryColor = useColorModeValue('brand.500', 'brand.300');
-  const focusBorderColor = useColorModeValue('brand.500', 'brand.300');
-  const mutedText = useColorModeValue('gray.600', 'gray.400');
 
   return (
-    <Box as="form" onSubmit={handleSubmit(onSubmit)}>
-      <Grid templateColumns={{ base: '1fr', lg: '2.5fr 1.5fr' }} gap={8} alignItems="start">
-        
-        {/* === LEFT COLUMN: FORM INPUTS === */}
-        <VStack spacing={6} align="stretch">
-          
-          <FormSection title="Client Details">
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-              <Box bg={useColorModeValue('gray.50', 'gray.700')} p={4} borderRadius="md" borderWidth="1px" borderStyle="dashed">
-                <Text fontSize="xs" fontWeight="bold" letterSpacing="wide" color={mutedText} mb={2}>FROM</Text>
-                <Text fontWeight="bold">{profile?.company_name || 'Your Company Name'}</Text>
-                <Text fontSize="sm" color={mutedText}>{profile?.company_address || 'No address set'}</Text>
-                {senderEmail && <Text fontSize="xs" color="blue.500">{senderEmail}</Text>}
-                {profile?.company_phone && <Text fontSize="xs" color="blue.500">{profile.company_phone}</Text>}
-              </Box>
+    <Box maxW="container.lg" mx="auto">
+      <WizardProgress currentStep={step} />
 
-              <Box>
-                <Text fontSize="xs" fontWeight="bold" letterSpacing="wide" color={mutedText} mb={2}>BILL TO</Text>
-                {isNewClient ? (
-                  <VStack spacing={3}>
-                    <FormControl isRequired><Input placeholder="Client Name" {...register('to.name')} focusBorderColor={focusBorderColor} bg="transparent" /></FormControl>
-                    <FormControl><Input placeholder="Client Email" type="email" {...register('to.email')} focusBorderColor={focusBorderColor} bg="transparent" /></FormControl>
-                    <FormControl><Textarea placeholder="Client Address" {...register('to.address')} focusBorderColor={focusBorderColor} size="sm" bg="transparent" /></FormControl>
-                    {clients?.length > 0 && <Button size="sm" variant="link" colorScheme="teal" onClick={() => setIsNewClient(false)}>Select Existing Client</Button>}
-                  </VStack>
-                ) : (
-                  <VStack spacing={3}>
-                    <FormControl isRequired>
-                      <Select placeholder="Select a client..." {...register('to.name')} focusBorderColor={focusBorderColor}>
-                        {clients.map(client => <option key={client.id} value={client.name!}>{client.name}</option>)}
-                      </Select>
-                    </FormControl>
-                    <Button size="sm" variant="link" colorScheme="teal" onClick={() => setIsNewClient(true)}>+ Create New Client</Button>
-                  </VStack>
-                )}
-              </Box>
-            </SimpleGrid>
-          </FormSection>
-
-          <FormSection title="Line Items">
-            <HStack display={{ base: 'none', md: 'flex' }} w="100%" spacing={4} color="gray.500" fontSize="xs" fontWeight="bold" letterSpacing="wide">
-              <Text flex={5}>DESCRIPTION</Text>
-              <Text flex={1.5} textAlign="right">QTY</Text>
-              <Text flex={2} textAlign="right">PRICE ({activeCurrency})</Text>
-              <Text flex={2} textAlign="right">TOTAL</Text>
-              <Box w="40px" />
-            </HStack>
+      {/* ✅ FIXED: Added explicit type to 'e' to satisfy strict mode */}
+      <Box as="form" onSubmit={(e: React.FormEvent) => e.preventDefault()}>
+        <Card bg={cardBg} borderRadius="xl" borderColor={cardBorder} borderWidth="1px" shadow="sm">
+          <CardBody p={{ base: 6, md: 8 }}>
             
-            {fields.map((field, index) => {
-              const quantity = watch(`lineItems.${index}.quantity`) || 0;
-              const unitPrice = watch(`lineItems.${index}.unitPrice`) || 0;
-              const itemTotal = quantity * unitPrice;
-              
-              return (
-                <SimpleGrid key={field.id} columns={{ base: 1, md: 5 }} spacing={4} alignItems="center">
-                  <FormControl gridColumn={{ base: '1 / -1', md: 'auto' }} flex={5}>
-                      <Input placeholder="Item description" {...register(`lineItems.${index}.description`)} focusBorderColor={focusBorderColor} />
-                  </FormControl>
-                  <FormControl flex={1.5}>
-                      <Input placeholder="Qty" type="number" {...register(`lineItems.${index}.quantity`, { valueAsNumber: true })} focusBorderColor={focusBorderColor} textAlign="right" />
-                  </FormControl>
-                  
-                  <FormControl flex={2}>
-                    <InputGroup>
-                        <InputLeftElement pointerEvents="none" color="gray.400" fontSize="xs" height="100%">
-                            {getCurrencySymbol(activeCurrency)}
-                        </InputLeftElement>
-                        <Input placeholder="0.00" type="number" step="0.01" {...register(`lineItems.${index}.unitPrice`, { valueAsNumber: true })} focusBorderColor={focusBorderColor} textAlign="right" />
-                    </InputGroup>
-                  </FormControl>
-                  
-                  <Text flex={2} textAlign="right" fontWeight="medium" fontFamily="mono">
-                    {formatMoney(itemTotal)}
-                  </Text>
-                  <IconButton aria-label="Remove item" icon={<Icon as={Trash2} boxSize={4} />} variant="ghost" colorScheme="red" size="sm" onClick={() => remove(index)} />
+            {/* === STEP 1: CLIENT === */}
+            {step === 0 && (
+              <VStack spacing={6} align="stretch" animation="fadeIn 0.3s">
+                {/* 🟢 COPY UPDATE: Professional Heading */}
+                <Heading size="md" color={textColor}>Client Details</Heading>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                  <Box p={4} bg={infoBoxBg} rounded="md" border="1px dashed" borderColor={infoBoxBorder}>
+                    <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={2}>FROM</Text>
+                    <Text fontWeight="bold" color={textColor}>{profile?.company_name || 'Your Company Name'}</Text>
+                    <Text fontSize="sm" color="gray.500">{senderEmail}</Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={2}>BILL TO</Text>
+                    {isNewClient ? (
+                      <VStack spacing={3}>
+                         <FormControl isRequired><Input placeholder="Client Name" {...register('to.name', { required: true })} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} /></FormControl>
+                         <FormControl><Input placeholder="Client Email" type="email" {...register('to.email')} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} /></FormControl>
+                         <FormControl><Textarea placeholder="Address (Optional)" {...register('to.address')} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} size="sm" resize="none" /></FormControl>
+                         {clients?.length > 0 && <Button size="sm" variant="link" colorScheme="blue" onClick={() => setIsNewClient(false)}>Select Existing Client</Button>}
+                      </VStack>
+                    ) : (
+                      <VStack spacing={3}>
+                        <FormControl isRequired>
+                          <Select placeholder="Select a client..." {...register('to.name', { required: true })} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor}>
+                            {clients.map(client => <option key={client.id} value={client.name!}>{client.name}</option>)}
+                          </Select>
+                        </FormControl>
+                        <Button size="sm" variant="link" colorScheme="blue" onClick={() => setIsNewClient(true)}>+ Create New Client</Button>
+                      </VStack>
+                    )}
+                  </Box>
                 </SimpleGrid>
-              );
-            })}
-            
-            <Button onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })} leftIcon={<Icon as={Plus} />} variant="outline" colorScheme="gray" size="sm" mt={2}>
-              Add Line Item
-            </Button>
-          </FormSection>
-
-          <FormSection title="Notes & Terms">
-            {/* 🟢 VISUAL INDICATOR for which default is being used */}
-            <Text fontSize="xs" color="gray.400" mb={1} textAlign="right">
-                Using default {documentType} terms
-            </Text>
-            <Textarea {...register('notes')} placeholder="e.g. Payment due within 30 days. Banking details..." rows={4} focusBorderColor={focusBorderColor} resize="none" />
-          </FormSection>
-        </VStack>
-
-        {/* === RIGHT COLUMN: SIDEBAR === */}
-        <VStack spacing={6} align="stretch" position={{ lg: 'sticky' }} top={6}>
-          
-          <FormSection title="Settings">
-            <HStack justify="space-between" align="center" p={3} bg={useColorModeValue('gray.50', 'gray.700')} borderRadius="md" mb={4}>
-              <Text fontWeight='bold' fontSize="sm" color={documentType === 'Quote' ? primaryColor : 'gray.500'}>QUOTE</Text>
-              
-              {/* 🟢 UPDATED SWITCH HANDLER */}
-              <Switch 
-                isChecked={documentType === 'Invoice'} 
-                onChange={(e) => handleDocTypeChange(e.target.checked)} 
-                colorScheme="teal" 
-                size="lg" 
-              />
-              
-              <Text fontWeight='bold' fontSize="sm" color={documentType === 'Invoice' ? primaryColor : 'gray.500'}>INVOICE</Text>
-            </HStack>
-            
-            {documentType === 'Invoice' && (
-              <PaymentMethodSelector 
-                settings={profile?.payment_settings || null} 
-                selectedUrl={selectedPaymentLink} 
-                onChange={setSelectedPaymentLink}
-              />
+              </VStack>
             )}
 
-            <FormControl mb={4}>
-                <FormLabel fontSize="sm" color="gray.500">Currency</FormLabel>
-                <Select value={activeCurrency} onChange={(e) => setActiveCurrency(e.target.value)} size="sm">
-                    <option value="ZAR">ZAR (R)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="NGN">NGN (₦)</option>
-                    <option value="KES">KES (KSh)</option>
-                    <option value="GHS">GHS (₵)</option>
-                    <option value="NAD">NAD (N$)</option>
-                    <option value="BWP">BWP (P)</option>
-                </Select>
-            </FormControl>
-
-            <FormControl mb={4}>
-              <FormLabel fontSize="sm" color="gray.500">Brand Color</FormLabel>
-              <HStack>
-                <Input type="color" {...register('brandColor')} w="50px" p={1} h="40px" cursor="pointer" borderRadius="md" />
-                <Text fontSize="xs" color="gray.500" fontFamily="mono">
-                    {watchedBrandColor ? watchedBrandColor.toUpperCase() : '#319795'}
-                </Text>
-              </HStack>
-            </FormControl>
-
-            <VStack spacing={4}>
-                <FormControl><FormLabel fontSize="sm">Document #</FormLabel><Input {...register('invoiceNumber')} focusBorderColor={focusBorderColor} /></FormControl>
-                <FormControl isRequired><FormLabel fontSize="sm">Date Issued</FormLabel><Input type="date" {...register('invoiceDate')} focusBorderColor={focusBorderColor} /></FormControl>
-                {documentType === 'Invoice' && (
-                    <FormControl><FormLabel fontSize="sm" color="orange.500">Due Date</FormLabel><Input type="date" {...register('dueDate')} focusBorderColor="orange.500" borderColor="orange.200" /></FormControl>
-                )}
-            </VStack>
-          </FormSection>
-
-          <FormSection title="Summary">
-             <VStack spacing={3} align="stretch">
-                <HStack justify="space-between"><Text color="gray.500">Subtotal</Text><Text fontFamily="mono">{formatMoney(subtotal)}</Text></HStack>
-                
-                <HStack justify="space-between">
-                    <Checkbox {...register('applyVat')} size="sm" colorScheme="teal">
-                        <HStack><Text fontSize="sm">VAT</Text><Input size="xs" w="40px" textAlign="center" {...register('vatRate')} /> <Text fontSize="sm">%</Text></HStack>
-                    </Checkbox>
-                    <Text fontFamily="mono" fontSize="sm">{formatMoney(vatAmount)}</Text>
+            {/* === STEP 2: LINE ITEMS === */}
+            {step === 1 && (
+              <VStack spacing={6} align="stretch" animation="fadeIn 0.3s">
+                <Flex justify="space-between" align="center">
+                    {/* 🟢 COPY UPDATE: Professional Heading */}
+                    <Heading size="md" color={textColor}>Line Items</Heading>
+                    <Badge colorScheme="blue" variant="subtle">{activeCurrency}</Badge>
+                </Flex>
+                <StackDivider borderColor={infoBoxBorder} />
+                <Box overflowX="auto">
+                  {fields.map((field, index) => (
+                    <SimpleGrid key={field.id} columns={{ base: 1, md: 12 }} spacing={4} mb={4} alignItems="center">
+                      <FormControl gridColumn={{ base: 'span 1', md: 'span 6' }}>
+                          {index === 0 && <FormLabel fontSize="xs" color="gray.500">DESCRIPTION</FormLabel>}
+                          <Input placeholder="Item description" {...register(`lineItems.${index}.description`, { required: true })} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} />
+                      </FormControl>
+                      <FormControl gridColumn={{ base: 'span 1', md: 'span 2' }}>
+                          {index === 0 && <FormLabel fontSize="xs" color="gray.500">QTY</FormLabel>}
+                          <Input type="number" {...register(`lineItems.${index}.quantity`, { valueAsNumber: true })} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} />
+                      </FormControl>
+                      <FormControl gridColumn={{ base: 'span 1', md: 'span 3' }}>
+                        {index === 0 && <FormLabel fontSize="xs" color="gray.500">PRICE</FormLabel>}
+                        <InputGroup>
+                            <InputLeftElement pointerEvents="none" color="gray.400" fontSize="xs" h="full">{getCurrencySymbol(activeCurrency)}</InputLeftElement>
+                            <Input type="number" step="0.01" {...register(`lineItems.${index}.unitPrice`, { valueAsNumber: true })} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} pl={8} />
+                        </InputGroup>
+                      </FormControl>
+                      <Box gridColumn={{ base: 'span 1', md: 'span 1' }} textAlign="center">
+                         {index === 0 && <Text fontSize="xs" color="transparent" mb={2}>X</Text>}
+                         <IconButton aria-label="Remove" icon={<Trash2 size={16} />} size="sm" colorScheme="red" variant="ghost" onClick={() => remove(index)} isDisabled={fields.length === 1} />
+                      </Box>
+                    </SimpleGrid>
+                  ))}
+                </Box>
+                <Button leftIcon={<Plus size={16} />} onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })} variant="outline" size="sm" alignSelf="start">Add Item</Button>
+                <Divider borderColor={infoBoxBorder} />
+                <HStack justify="flex-end">
+                  <Text fontWeight="bold" fontSize="lg" color={textColor}>Total: {formatMoney(total)}</Text>
                 </HStack>
-                
-                <Divider my={2} />
-                <HStack justify="space-between" fontWeight="bold" fontSize="xl">
-                    <Text>Total</Text>
-                    <Text color={primaryColor}>{formatMoney(total)}</Text>
-                </HStack>
-            </VStack>
-          </FormSection>
+              </VStack>
+            )}
 
-          <VStack spacing={3} width="100%">
-            <Button type="submit" colorScheme="brand" width="100%" size="lg" isLoading={isSubmitting} leftIcon={<Icon as={Save} />} loadingText="Saving...">
-                {isEditing ? 'Update & Save' : 'Save Document'}
-            </Button>
-            <Button onClick={handleDownloadPdf} type="button" variant="outline" colorScheme="gray" width="100%" size="lg" isLoading={isGeneratingPdf} leftIcon={<Icon as={Download} />} loadingText="Generating...">
-                Download PDF
-            </Button>
-          </VStack>
+            {/* === STEP 3: TERMS & META === */}
+            {step === 2 && (
+              <VStack spacing={6} align="stretch" animation="fadeIn 0.3s">
+                <Heading size="md" color={textColor}>Invoice Details & Payment</Heading>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                    <VStack spacing={4}>
+                         <FormControl isRequired><FormLabel fontSize="sm" color={textColor}>Invoice Number</FormLabel><Input {...register('invoiceNumber', { required: true })} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} placeholder="e.g. INV-001" /></FormControl>
+                         <FormControl isRequired><FormLabel fontSize="sm" color={textColor}>Issued Date</FormLabel><Input type="date" {...register('invoiceDate', { required: true })} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} /></FormControl>
+                         <FormControl isRequired><FormLabel fontSize="sm" color={textColor}>Due Date</FormLabel><Input type="date" {...register('dueDate', { required: true })} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} /></FormControl>
+                    </VStack>
+                    <VStack spacing={4}>
+                         <FormControl>
+                            <FormLabel fontSize="sm" color={textColor}>Currency</FormLabel>
+                            <Select value={activeCurrency} onChange={(e) => setActiveCurrency(e.target.value)} size="md" bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor}>
+                                <option value="ZAR">ZAR (South African Rand)</option>
+                                <option value="USD">USD (United States Dollar)</option>
+                                <option value="EUR">EUR (Euro)</option>
+                                <option value="GBP">GBP (British Pound)</option>
+                                <option value="NGN">NGN (Nigerian Naira)</option>
+                                <option value="KES">KES (Kenyan Shilling)</option>
+                            </Select>
+                         </FormControl>
 
-        </VStack>
-      </Grid>
+                         {/* 🟢 USDT CHECK: Shows only for USD */}
+                         {activeCurrency === 'USD' && (
+                             <Alert status={profile?.wallet_address ? 'success' : 'warning'} variant="left-accent" fontSize="xs" rounded="md">
+                                <AlertIcon boxSize="16px" />
+                                <Box>
+                                    <Text fontWeight="bold">Crypto (USDT on Polygon) {profile?.wallet_address ? 'Active' : 'Missing'}</Text>
+                                    <Text>{profile?.wallet_address ? 'Clients can pay via Crypto (USDT on Polygon).' : 'Required to receive crypto payments (USDT on Polygon).'}</Text>
+                                </Box>
+                             </Alert>
+                         )}
+
+                         <FormControl>
+                           <FormLabel fontSize="sm" color={textColor}>Brand Color</FormLabel>
+                           <HStack>
+                             <Input type="color" {...register('brandColor')} w="50px" h="40px" p={1} rounded="md" cursor="pointer" bg={inputBg} borderColor={inputBorder} />
+                             <Text fontSize="xs" color="gray.500">{watch('brandColor')}</Text>
+                           </HStack>
+                         </FormControl>
+                    </VStack>
+                </SimpleGrid>
+
+                <Box pt={4}>
+                    <PaymentMethodSelector settings={profile?.payment_settings || null} selectedUrl={selectedPaymentLink} onChange={setSelectedPaymentLink} />
+                </Box>
+
+                <FormControl>
+                    <FormLabel fontSize="sm" color={textColor}>VAT Settings</FormLabel>
+                    <HStack>
+                        <Checkbox {...register('applyVat')} colorScheme="brand" size="lg">
+                            <Text fontSize="sm" fontWeight="bold" color={textColor}>Apply VAT</Text>
+                        </Checkbox>
+                        {applyVat && (
+                           <InputGroup size="sm" maxW="120px">
+                             <Input type="number" {...register('vatRate')} bg={inputBg} borderColor={inputBorder} />
+                             <InputLeftElement children="%" pointerEvents="none" color="gray.400" />
+                           </InputGroup>
+                        )}
+                    </HStack>
+                </FormControl>
+
+                <FormControl>
+                    <FormLabel fontSize="sm" color={textColor}>Notes / Terms</FormLabel>
+                    <Textarea {...register('notes')} placeholder="Thank you for your business. Payment is due within 7 days of the invoice date." rows={3} bg={inputBg} borderColor={inputBorder} focusBorderColor={focusColor} />
+                </FormControl>
+              </VStack>
+            )}
+
+            {/* === STEP 4: REVIEW === */}
+            {step === 3 && (
+              <VStack spacing={6} align="stretch" animation="fadeIn 0.3s">
+                 <Heading size="md" textAlign="center" color={textColor}>Review Invoice</Heading>
+                 <Text textAlign="center" color="gray.500" fontSize="sm">Ensure everything is correct before finalizing.</Text>
+
+                 {/* 🟢 FIX: Dark Mode adaptive review box */}
+                 <Box bg={reviewBoxBg} p={6} rounded="lg" border="1px solid" borderColor={infoBoxBorder}>
+                    <Flex justify="space-between" mb={4}>
+                        <Box>
+                            <Text fontWeight="bold" fontSize="lg" color={textColor}>{watch('to.name')}</Text>
+                            <Text fontSize="sm" color="gray.500">Invoice #{watch('invoiceNumber')}</Text>
+                        </Box>
+                        <Text fontWeight="bold" fontSize="xl" color="brand.500">{formatMoney(total)}</Text>
+                    </Flex>
+                    <StackDivider borderColor={infoBoxBorder} mb={4} />
+                    <VStack align="stretch" spacing={2} mb={6}>
+                        {watchedLineItems.map((item, i) => (
+                            <Flex key={i} justify="space-between" fontSize="sm" color={textColor}>
+                                <Text>{item.quantity} x {item.description}</Text>
+                                <Text>{formatMoney(item.quantity * item.unitPrice)}</Text>
+                            </Flex>
+                        ))}
+                    </VStack>
+                    <HStack justify="space-between" pt={4} borderTop="1px dashed" borderColor={infoBoxBorder}>
+                        <Text fontSize="sm" color="gray.500">VAT ({applyVat ? watchedVatRate : 0}%)</Text>
+                        <VStack align="end" spacing={0}>
+                            {applyVat && <Text fontSize="xs" color="gray.500">VAT: {formatMoney(vatAmount)}</Text>}
+                            <Text fontWeight="bold" color={textColor}>Total Due: {formatMoney(total)}</Text>
+                        </VStack>
+                    </HStack>
+                 </Box>
+
+                 <Button 
+                    type="button"
+                    variant="outline" 
+                    size="lg" 
+                    w="full" 
+                    leftIcon={<Download size={18} />} 
+                    onClick={handleDownloadPdf} 
+                    isLoading={isGeneratingPdf} 
+                    loadingText="Generating PDF..."
+                    colorScheme="gray"
+                    borderColor={inputBorder}
+                    _hover={{ bg: infoBoxBg }}
+                 >
+                    Preview PDF
+                 </Button>
+              </VStack>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* === WIZARD CONTROLS === */}
+        <Flex mt={8} justify="space-between">
+            <Button onClick={handleBack} isDisabled={step === 0 || isSubmitting} variant="ghost" leftIcon={<ArrowLeft size={18} />}>Back</Button>
+            
+            {step < 3 ? (
+                <Button onClick={handleNext} colorScheme="brand" rightIcon={<ArrowRight size={18} />} px={8}>Next Step</Button>
+            ) : (
+                <ButtonGroup spacing={4}>
+                    <Button 
+                        onClick={handleSubmit((data) => onSubmit(data, 'Draft'))} 
+                        variant="outline" 
+                        size="lg" 
+                        isLoading={isSubmitting}
+                        leftIcon={<Save size={18} />}
+                    >
+                        Save as Draft
+                    </Button>
+                    <Button 
+                        onClick={handleSubmit((data) => onSubmit(data, 'Sent'))} 
+                        colorScheme="green" 
+                        size="lg" 
+                        isLoading={isSubmitting}
+                        leftIcon={<Send size={18} />}
+                        shadow="lg"
+                    >
+                        {/* 🟢 COPY UPDATE: Simplified Action */}
+                        Issue Invoice
+                    </Button>
+                </ButtonGroup>
+            )}
+        </Flex>
+      </Box>
     </Box>
   );
 };
+
+export default InvoiceForm;

@@ -27,7 +27,7 @@ import {
 import Image from 'next/image';
 import NextLink from 'next/link';
 import { FaGoogle, FaGithub, FaLinkedin, FaTwitter } from 'react-icons/fa';
-import { SiNotion } from 'react-icons/si'; // Notion Icon
+import { SiNotion } from 'react-icons/si'; 
 import { Eye, EyeOff } from 'lucide-react';
 import { AuthLayout } from '@/components/AuthLayout';
 
@@ -45,8 +45,9 @@ export default function SignUpPage() {
 
   // Theme Variables
   const boxBg = useColorModeValue('white', 'gray.900');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const borderColor = useColorModeValue('gray.300', 'gray.600'); // Improved contrast
   const tealColor = useColorModeValue('teal.600', 'teal.400');
+  const labelColor = useColorModeValue('gray.700', 'gray.300');
   
   // LOGO VISIBILITY LOGIC
   const logoFilter = useColorModeValue(
@@ -104,7 +105,7 @@ export default function SignUpPage() {
       <Box 
         rounded="2xl" 
         bg={boxBg} 
-        boxShadow="2xl" 
+        boxShadow="xl" 
         p={{ base: 6, md: 8 }} 
         border="1px" 
         borderColor={borderColor}
@@ -117,7 +118,7 @@ export default function SignUpPage() {
           <Box filter={logoFilter} transition="all 0.3s">
             <Image src="/logo.svg" alt="QuotePilot" width={48} height={48} priority />
           </Box>
-          <Heading fontSize="xl" textAlign="center" fontWeight="bold" color={useColorModeValue('gray.700', 'white')}>
+          <Heading as="h1" fontSize="xl" textAlign="center" fontWeight="bold" color={useColorModeValue('gray.800', 'white')}>
             Create your account
           </Heading>
         </VStack>
@@ -134,6 +135,7 @@ export default function SignUpPage() {
             leftIcon={<Icon as={FaGoogle} />} 
             onClick={() => handleOAuthSignIn('google')}
             fontSize="sm"
+            aria-label="Sign up with Google"
           >
             Google
           </Button>
@@ -143,6 +145,7 @@ export default function SignUpPage() {
             leftIcon={<Icon as={FaGithub} />} 
             onClick={() => handleOAuthSignIn('github')}
             fontSize="sm"
+            aria-label="Sign up with GitHub"
           >
             GitHub
           </Button>
@@ -152,6 +155,7 @@ export default function SignUpPage() {
             leftIcon={<Icon as={FaLinkedin} color="#0077b5" />} 
             onClick={() => handleOAuthSignIn('linkedin_oidc')}
             fontSize="sm"
+            aria-label="Sign up with LinkedIn"
           >
             LinkedIn
           </Button>
@@ -161,6 +165,7 @@ export default function SignUpPage() {
             leftIcon={<Icon as={FaTwitter} />} 
             onClick={() => handleOAuthSignIn('twitter')}
             fontSize="sm"
+            aria-label="Sign up with X (Twitter)"
           >
             X (Twitter)
           </Button>
@@ -172,6 +177,7 @@ export default function SignUpPage() {
             fontSize="sm"
             gridColumn="span 2"
             _hover={{ bg: useColorModeValue('gray.50', 'whiteAlpha.100') }}
+            aria-label="Sign up with Notion"
           >
             Continue with Notion
           </Button>
@@ -188,19 +194,20 @@ export default function SignUpPage() {
         <form onSubmit={handleSignUp}>
           <Stack spacing={4}>
             <FormControl id="email-signup" isRequired>
-              <FormLabel fontSize="sm">Email address</FormLabel>
+              <FormLabel fontSize="sm" color={labelColor}>Email address</FormLabel>
               <Input 
                 type="email" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
                 placeholder="you@company.com" 
                 borderColor={borderColor}
-                focusBorderColor="teal.400" 
+                focusBorderColor="teal.500"
+                _hover={{ borderColor: 'teal.300' }}
               />
             </FormControl>
             
             <FormControl id="password-signup" isRequired>
-              <FormLabel fontSize="sm">Password</FormLabel>
+              <FormLabel fontSize="sm" color={labelColor}>Password</FormLabel>
               <InputGroup size="md">
                 <Input 
                   type={showPassword ? 'text' : 'password'} 
@@ -208,10 +215,11 @@ export default function SignUpPage() {
                   onChange={(e) => setPassword(e.target.value)} 
                   placeholder="6+ characters" 
                   borderColor={borderColor}
-                  focusBorderColor="teal.400"
+                  focusBorderColor="teal.500"
+                  _hover={{ borderColor: 'teal.300' }}
                 />
                 <InputRightElement width="3rem">
-                  <Button h="1.75rem" size="sm" onClick={() => setShowPassword(!showPassword)} variant="ghost">
+                  <Button h="1.75rem" size="sm" onClick={() => setShowPassword(!showPassword)} variant="ghost" aria-label={showPassword ? "Hide password" : "Show password"}>
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </Button>
                 </InputRightElement>
@@ -224,7 +232,7 @@ export default function SignUpPage() {
           </Stack>
         </form>
 
-        <Text mt={6} textAlign="center" fontSize="sm" color="gray.500">
+        <Text mt={6} textAlign="center" fontSize="sm" color="gray.600">
           Already have an account? <Link as={NextLink} href="/sign-in" color={tealColor} fontWeight="bold">Sign In</Link>
         </Text>
       </Box>

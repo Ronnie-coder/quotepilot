@@ -1,175 +1,243 @@
 'use client';
 
-import { 
-  Box, 
-  Button, 
-  Menu, 
-  MenuButton, 
-  MenuItem, 
-  MenuList, 
-  Text, 
-  useToast, 
+import {
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
+  Button,
+  useDisclosure,
+  VStack,
+  Text,
+  Input,
+  InputGroup,
+  InputRightElement,
+  useClipboard,
+  Icon,
+  HStack,
+  Box,
+  useToast,
+  IconButton,
   Tooltip,
-  IconButton
+  Divider,
+  useColorModeValue
 } from '@chakra-ui/react';
-import { FiShare2, FiLink, FiMail, FiCheck } from 'react-icons/fi';
-import { FaWhatsapp } from 'react-icons/fa';
-import { useState, useTransition } from 'react';
-import { sendInvoiceEmail } from '@/app/actions/sendInvoiceEmail'; 
+import { Share2, Copy, Check, MessageCircle, Send, Mail } from 'lucide-react';
+import { updateDocumentStatusAction } from '@/app/dashboard/invoices/actions';
+import { useTransition } from 'react';
+import { sendInvoiceEmail } from '@/app/actions/sendInvoiceEmail';
 
 interface ShareInvoiceProps {
   quoteId: string;
   invoiceNumber: string;
-  clientName: string;
-  clientEmail?: string | null;
-  businessName: string; 
-  type?: 'invoice' | 'quote'; 
-  paymentLink?: string | null;
-  size?: "sm" | "md";
+  clientName?: string;
+  clientEmail?: string | null; 
+  businessName?: string;
+  amount?: number;
+  currency?: string;
+  type?: string; 
+  paymentLink?: string | null; 
   isIconOnly?: boolean;
 }
 
 export default function ShareInvoice({ 
   quoteId, 
   invoiceNumber, 
-  clientName, 
+  clientName = 'Valued Client', 
   clientEmail,
-  businessName,
-  type = 'invoice', 
+  businessName = 'Us',
   paymentLink,
-  size = "md",
+  currency, 
   isIconOnly = false
 }: ShareInvoiceProps) {
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
-  const [isPending, startTransition] = useTransition(); 
-  const [hasCopied, setHasCopied] = useState(false);
+  const [isEmailPending, startEmailTransition] = useTransition();
 
-  const handleCopyLink = () => {
-    const origin = window.location.origin;
-    const url = `${origin}/p/${quoteId}`;
-    
-    navigator.clipboard.writeText(url);
-    setHasCopied(true);
-    toast({
-      title: "Link Copied",
-      status: "success",
-      duration: 2000,
-      position: "top"
-    });
-    setTimeout(() => setHasCopied(false), 2000);
+  // Dark Mode colors
+  const inputBg = useColorModeValue('gray.50', 'gray.700');
+  const inputText = useColorModeValue('gray.600', 'gray.100');
+  const infoBoxBg = useColorModeValue('blue.50', 'blue.900');
+  const infoBoxBorder = useColorModeValue('blue.100', 'blue.700');
+  const infoTitle = useColorModeValue('blue.700', 'blue.200');
+  const infoText = useColorModeValue('blue.600', 'blue.300');
+
+  // 1. Construct the Public URL
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const publicUrl = `${origin}/p/${quoteId}`;
+
+  // 2. Clipboard Logic
+  const { hasCopied, onCopy } = useClipboard(publicUrl);
+
+  const handleCopy = () => {
+    onCopy();
+    toast({ title: 'Link copied', status: 'success', duration: 2000 });
   };
 
-  const handleWhatsApp = () => {
-    const origin = window.location.origin;
-    const viewLink = `${origin}/p/${quoteId}`;
+  // 3. WhatsApp Logic
+  const handleWhatsAppShare = async () => {
+    // Base Message
+    let text = `Hi ${clientName}, Invoice *#${invoiceNumber}* from ${businessName} is ready.\n\nView Invoice:\n${publicUrl}`;
+
+    // Smart Payment Logic
+    if (paymentLink) {
+        text += `\n\nPay securely online:\n${paymentLink}`;
+    } 
     
-    let rawMessage = "";
-
-    if (type === 'quote') {
-      // PROPOSAL TEMPLATE (No emojis, professional)
-      rawMessage = `Hi ${clientName},
-
-Here is the proposal outlining the work and pricing.
-
-Review it here:
-${viewLink}
-
-Let me know if you have any questions.
-
-Best regards,
-${businessName}`;
-
-    } else {
-      // INVOICE TEMPLATE (Prioritizes Payment Link, No emojis)
-      let paymentSection = "";
-
-      if (paymentLink) {
-        paymentSection = `Pay securely online:\n${paymentLink}`;
-      } else {
-        const fallbackLink = `${origin}/p/${quoteId}?action=pay`; 
-        paymentSection = `View payment details:\n${fallbackLink}`;
-      }
-
-      rawMessage = `Hi ${clientName},
-
-Here is invoice ${invoiceNumber} from ${businessName}.
-
-View invoice:
-${viewLink}
-
-${paymentSection}
-
-Thank you.`;
+    // Add Crypto note for USD
+    if (currency === 'USD') {
+        const prefix = paymentLink ? "Or pay" : "Pay";
+        text += `\n\n${prefix} via Crypto (USDT) securely on the invoice page.`;
     }
 
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(rawMessage)}`;
-    window.open(whatsappUrl, '_blank');
+    const encodedText = encodeURIComponent(text);
+    
+    // Open WhatsApp
+    window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+
+    // Auto-mark as Sent
+    updateDocumentStatusAction(quoteId, 'Sent');
+    
+    toast({
+        title: 'Opened WhatsApp',
+        description: 'Marked invoice as sent.',
+        status: 'success',
+        duration: 3000
+    });
+    
+    onClose();
   };
 
+  // 4. Email Logic
   const handleEmailSend = () => {
     if (!clientEmail) {
-      toast({ title: "Missing Email", description: "Client has no email saved.", status: "warning" });
+      toast({ title: "No Email Found", description: "This client does not have an email address saved.", status: "warning" });
       return;
     }
 
-    startTransition(async () => {
+    startEmailTransition(async () => {
       const result = await sendInvoiceEmail(quoteId);
-
       if (result.success) {
         toast({ title: "Email Sent", description: `Sent to ${clientEmail}`, status: "success" });
+        updateDocumentStatusAction(quoteId, 'Sent');
       } else {
         toast({ title: "Delivery Failed", description: result.message, status: "error" });
       }
     });
   };
 
-  const TriggerButton = isIconOnly ? (
-    <IconButton
-      as={MenuButton}
-      aria-label="Share"
-      icon={<FiShare2 />}
-      size="sm"
-      variant="ghost"
-      isLoading={isPending}
-      onClick={(e) => e.stopPropagation()}
-    />
+  // --- 🟢 DYNAMIC COPY LOGIC ---
+  const didYouKnowText = currency === 'USD'
+    ? "Sharing this link lets clients see the Verified Badge and pay via online payment or Crypto (USDT) instantly."
+    : "Sharing this link lets clients see the Verified Badge and pay via online payment instantly.";
+
+  // --- RENDER TRIGGER ---
+  const Trigger = isIconOnly ? (
+    <Tooltip label="Share Invoice">
+        <IconButton 
+            aria-label="Share" 
+            icon={<Share2 size={16} />} 
+            size="sm" 
+            variant="ghost" 
+            colorScheme="blue"
+            onClick={(e) => { e.stopPropagation(); onOpen(); }}
+        />
+    </Tooltip>
   ) : (
-    <MenuButton 
-      as={Button} 
-      rightIcon={<FiShare2 />} 
-      colorScheme="blue" 
-      size={size}
-      isLoading={isPending}
-      loadingText="Sending..."
-      onClick={(e) => e.stopPropagation()}
-    >
+    <Button leftIcon={<Share2 size={16} />} colorScheme="blue" onClick={(e) => { e.stopPropagation(); onOpen(); }}>
       Share
-    </MenuButton>
+    </Button>
   );
 
   return (
-    <Box onClick={(e) => e.stopPropagation()}>
-      <Menu isLazy placement="bottom-end">
-        {TriggerButton}
-        <MenuList>
-          <Box px={3} py={2} borderBottomWidth="1px" borderColor="gray.100" mb={1}>
-            <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase">
-              {type} #{invoiceNumber}
-            </Text>
-          </Box>
-          <MenuItem icon={hasCopied ? <FiCheck /> : <FiLink />} onClick={handleCopyLink}>
-            {hasCopied ? "Copied!" : "Copy Public Link"}
-          </MenuItem>
-          <MenuItem icon={<FaWhatsapp size={18} />} onClick={handleWhatsApp} color="green.500">
-            Send via WhatsApp
-          </MenuItem>
-          <Tooltip label={clientEmail ? `Send to ${clientEmail}` : "No email"} hasArrow placement='left'>
-            <MenuItem icon={<FiMail />} onClick={handleEmailSend} isDisabled={!clientEmail || isPending} color="blue.500">
-              Email to Client
-            </MenuItem>
-          </Tooltip>
-        </MenuList>
-      </Menu>
-    </Box>
+    <>
+      {Trigger}
+
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="md">
+        <ModalOverlay backdropFilter="blur(2px)" />
+        <ModalContent borderRadius="xl" onClick={(e) => e.stopPropagation()}>
+          <ModalHeader fontSize="lg" fontWeight="bold">Share Invoice</ModalHeader>
+          <ModalCloseButton />
+          
+          <ModalBody pb={6}>
+            <VStack spacing={6} align="stretch">
+              
+              <Button 
+                colorScheme="whatsapp" 
+                size="lg" 
+                h="56px"
+                leftIcon={<MessageCircle size={24} />}
+                onClick={handleWhatsAppShare}
+                bg="#25D366" 
+                _hover={{ bg: "#128C7E" }}
+                color="white"
+                shadow="md"
+              >
+                Send via WhatsApp
+              </Button>
+
+              <Button 
+                colorScheme="blue" 
+                variant="outline"
+                size="lg" 
+                h="56px"
+                leftIcon={<Mail size={24} />}
+                onClick={handleEmailSend}
+                isLoading={isEmailPending}
+                loadingText="Sending..."
+                isDisabled={!clientEmail}
+              >
+                {clientEmail ? `Email to ${clientEmail}` : 'No Email for Client'}
+              </Button>
+
+              <HStack>
+                <Divider />
+                <Text fontSize="xs" color="gray.400" fontWeight="bold" whiteSpace="nowrap">OR COPY LINK</Text>
+                <Divider />
+              </HStack>
+
+              <InputGroup size="md">
+                <Input 
+                    value={publicUrl} 
+                    isReadOnly 
+                    bg={inputBg} 
+                    fontSize="sm" 
+                    color={inputText}
+                    pr="4.5rem"
+                    borderColor="transparent"
+                    _focus={{ borderColor: 'blue.500' }}
+                />
+                <InputRightElement width="4.5rem">
+                  <IconButton
+                    h="1.75rem"
+                    size="sm"
+                    onClick={handleCopy}
+                    icon={hasCopied ? <Check size={16} /> : <Copy size={16} />}
+                    aria-label="Copy link"
+                    colorScheme={hasCopied ? "green" : "gray"}
+                  />
+                </InputRightElement>
+              </InputGroup>
+
+              <Box bg={infoBoxBg} p={3} borderRadius="md" border="1px solid" borderColor={infoBoxBorder}>
+                <HStack align="start">
+                    <Icon as={Send} color="blue.500" mt={1} size={16} />
+                    <Box>
+                        <Text fontSize="xs" fontWeight="bold" color={infoTitle}>Did you know?</Text>
+                        <Text fontSize="xs" color={infoText}>
+                            {/* 🟢 Render Dynamic Text */}
+                            <b>{didYouKnowText}</b>
+                        </Text>
+                    </Box>
+                </HStack>
+              </Box>
+
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+    </>
   );
 }

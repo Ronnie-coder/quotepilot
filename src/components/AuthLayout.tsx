@@ -18,7 +18,12 @@ export const AuthLayout = ({ children }: { children: React.ReactNode }) => {
   const bgColor = useColorModeValue('gray.50', 'black');
   // Dark mode blob color adjusted for better visibility
   const blobColor = useColorModeValue('brand.100', 'brand.900'); 
-  const logoFilter = useColorModeValue('none', 'drop-shadow(0 0 5px rgba(49, 151, 149, 0.5))');
+  
+  // ✅ FIX: Invert colors in dark mode to make the black logo white
+  const logoFilter = useColorModeValue('none', 'brightness(0) invert(1)');
+  
+  // ✅ FIX: Explicitly set text color to white in dark mode
+  const textColor = useColorModeValue('gray.900', 'white');
 
   // Ambient background animation
   useEffect(() => {
@@ -103,10 +108,12 @@ export const AuthLayout = ({ children }: { children: React.ReactNode }) => {
             _hover={{ opacity: 0.8 }} 
             transition="opacity 0.2s"
         >
+          {/* ✅ Applied filter to invert logo color in dark mode */}
           <Box filter={logoFilter}>
              <Image src="/logo.svg" alt="QuotePilot Logo" boxSize="48px" />
           </Box>
-          <Heading as="h1" size="lg" fontWeight="800" letterSpacing="tight" textTransform="uppercase">
+          {/* ✅ Applied explicit text color */}
+          <Heading as="h1" size="lg" fontWeight="800" letterSpacing="tight" textTransform="uppercase" color={textColor}>
             QuotePilot
           </Heading>
         </MotionBox>

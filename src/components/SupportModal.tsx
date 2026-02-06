@@ -4,7 +4,8 @@ import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton,
   Button, FormControl, FormLabel, Input, Textarea, Select, VStack, useToast, Text, useColorModeValue
 } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Send } from 'lucide-react';
 
 type SupportModalProps = {
   isOpen: boolean;
@@ -15,41 +16,52 @@ type SupportModalProps = {
 export const SupportModal = ({ isOpen, onClose, email }: SupportModalProps) => {
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const bg = useColorModeValue('white', 'gray.800');
+  
+  // Theme Colors
+  const modalBg = useColorModeValue('white', 'gray.800');
+  const inputBg = useColorModeValue('white', 'gray.700');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const footerBg = useColorModeValue('gray.50', 'whiteAlpha.50');
 
   // Form State
   const [formData, setFormData] = useState({
     topic: '',
     message: '',
-    pilotEmail: email || ''
+    contactEmail: email || ''
   });
+
+  // Update local state if prop changes
+  useEffect(() => {
+    if (email) {
+      setFormData(prev => ({ ...prev, contactEmail: email }));
+    }
+  }, [email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      // Connect to our new Next.js API route
+      // Connect to Next.js API route
       const response = await fetch('/api/support', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: formData.pilotEmail || email, 
+          email: formData.contactEmail || email, 
           topic: formData.topic,
           message: formData.message,
         }),
       });
 
-      // Handle non-200 responses
       if (!response.ok) {
-        throw new Error('Transmission failed');
+        throw new Error('Sending failed');
       }
 
       toast({
-        title: 'Transmission Successful',
-        description: 'Support ticket created. Check your email for updates.',
+        title: 'Message Sent',
+        description: 'Support ticket created. We will be in touch shortly.',
         status: 'success',
         duration: 5000,
         isClosable: true,
@@ -58,19 +70,20 @@ export const SupportModal = ({ isOpen, onClose, email }: SupportModalProps) => {
       });
       
       onClose();
-      setFormData({ topic: '', message: '', pilotEmail: '' }); // Reset form
+      setFormData({ topic: '', message: '', contactEmail: email || '' }); 
       
     } catch (error) {
       console.error(error);
-      // Fallback for demo purposes if API isn't built yet
+      // Fallback for demo
       toast({
-        title: 'Transmission Simluation',
-        description: 'API not detected, but the UI is working perfectly, Pilot.',
+        title: 'Simulation Mode',
+        description: 'Support system is currently in demo mode. Message logged locally.',
         status: 'info',
         duration: 5000,
         isClosable: true,
         position: 'top',
       });
+      onClose();
     } finally {
       setIsSubmitting(false);
     }
@@ -79,33 +92,41 @@ export const SupportModal = ({ isOpen, onClose, email }: SupportModalProps) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg" isCentered motionPreset="slideInBottom">
       <ModalOverlay backdropFilter="blur(5px)" />
-      <ModalContent rounded="xl" bg={bg} boxShadow="2xl">
-        <ModalHeader borderBottomWidth="1px" borderColor={useColorModeValue('gray.100', 'gray.700')}>
-          Contact Command
+      <ModalContent rounded="xl" bg={modalBg} boxShadow="2xl">
+        <ModalHeader borderBottomWidth="1px" borderColor={borderColor}>
+          Contact Support
         </ModalHeader>
         <ModalCloseButton />
+        
         <ModalBody py={6}>
           <Text fontSize="sm" color="gray.500" mb={6}>
-            Encountering turbulence? Fill out the log below and our ground crew will respond via email.
+            Need assistance? Fill out the form below and our support team will respond via email.
           </Text>
+          
           <form id="support-form" onSubmit={handleSubmit}>
             <VStack spacing={5}>
+              
               <FormControl isRequired>
-                <FormLabel fontSize="sm" fontWeight="semibold">Pilot Email</FormLabel>
+                <FormLabel fontSize="sm" fontWeight="semibold">Email Address</FormLabel>
                 <Input 
                   type="email" 
-                  value={formData.pilotEmail} 
-                  onChange={(e) => setFormData({...formData, pilotEmail: e.target.value})}
+                  value={formData.contactEmail} 
+                  onChange={(e) => setFormData({...formData, contactEmail: e.target.value})}
                   placeholder="you@example.com" 
-                  borderColor={useColorModeValue('gray.300', 'gray.600')}
+                  bg={inputBg}
+                  borderColor={borderColor}
+                  focusBorderColor="brand.500"
                 />
               </FormControl>
+
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="semibold">Topic</FormLabel>
                 <Select 
-                  placeholder="Select flight parameter" 
+                  placeholder="Select a topic" 
                   onChange={(e) => setFormData({...formData, topic: e.target.value})}
-                  borderColor={useColorModeValue('gray.300', 'gray.600')}
+                  bg={inputBg}
+                  borderColor={borderColor}
+                  focusBorderColor="brand.500"
                 >
                   <option value="Bug Report">Report a Bug 🪲</option>
                   <option value="Feature Request">Feature Request 🚀</option>
@@ -113,24 +134,36 @@ export const SupportModal = ({ isOpen, onClose, email }: SupportModalProps) => {
                   <option value="General">Other / General 💬</option>
                 </Select>
               </FormControl>
+
               <FormControl isRequired>
                 <FormLabel fontSize="sm" fontWeight="semibold">Message</FormLabel>
                 <Textarea 
-                  placeholder="Describe the situation in detail..." 
+                  placeholder="Describe the issue in detail..." 
                   rows={5} 
                   resize="none" 
                   value={formData.message}
                   onChange={(e) => setFormData({...formData, message: e.target.value})}
-                  borderColor={useColorModeValue('gray.300', 'gray.600')}
+                  bg={inputBg}
+                  borderColor={borderColor}
+                  focusBorderColor="brand.500"
                 />
               </FormControl>
+
             </VStack>
           </form>
         </ModalBody>
-        <ModalFooter bg={useColorModeValue('gray.50', 'whiteAlpha.50')} borderBottomRadius="xl">
+
+        <ModalFooter bg={footerBg} borderBottomRadius="xl">
           <Button variant="ghost" mr={3} onClick={onClose}>Cancel</Button>
-          <Button colorScheme="teal" type="submit" form="support-form" isLoading={isSubmitting} loadingText="Transmitting">
-            Transmit
+          <Button 
+            colorScheme="blue" // Updated from Teal to match the rest of the app
+            type="submit" 
+            form="support-form" 
+            isLoading={isSubmitting} 
+            loadingText="Sending..."
+            leftIcon={<Send size={16} />}
+          >
+            Send Message
           </Button>
         </ModalFooter>
       </ModalContent>

@@ -20,7 +20,7 @@ type Client = {
   name: string | null;
   email: string | null;
   address?: string | null; 
-  phone?: string | null; // 🟢 Added Phone Type
+  phone?: string | null; 
   revenueBreakdown: { currency: string; amount: number }[];
 };
 
@@ -68,7 +68,7 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
 
-  // 🟢 FIX: Call hooks at the top level
+  // Dark Mode colors
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const rowHoverBg = useColorModeValue('gray.50', 'gray.700');
@@ -76,7 +76,8 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
   const textColor = useColorModeValue('gray.600', 'gray.400');
   const primaryColor = useColorModeValue('brand.500', 'brand.300'); 
   const headingColor = useColorModeValue('gray.800', 'white');
-  const iconBg = useColorModeValue('brand.50', 'whiteAlpha.100'); // 🟢 Moved out of loop
+  const iconBg = useColorModeValue('brand.50', 'whiteAlpha.100'); 
+  const inputBg = useColorModeValue('white', 'gray.700');
 
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -177,10 +178,10 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
           <Table variant="simple">
             <Thead bg={theadBg}>
               <Tr>
-                <Th py={4}>Client Name</Th>
-                <Th py={4}>Email</Th>
-                <Th py={4} isNumeric>Total Revenue (Paid)</Th>
-                <Th py={4} isNumeric>Actions</Th>
+                <Th py={4} color="gray.500">Client Name</Th>
+                <Th py={4} color="gray.500">Email</Th>
+                <Th py={4} isNumeric color="gray.500">Total Revenue (Paid)</Th>
+                <Th py={4} isNumeric color="gray.500">Actions</Th>
               </Tr>
             </Thead>
             <Tbody>
@@ -195,7 +196,6 @@ export default function ClientsClientPage({ clients = [], count, page, limit, us
                   >
                     <Td py={4}>
                         <HStack>
-                            {/* 🟢 FIX: Use pre-calculated variable */}
                             <Box p={2} bg={iconBg} rounded="lg" color={primaryColor}>
                                 <Icon as={UserIcon} size={16} />
                             </Box>

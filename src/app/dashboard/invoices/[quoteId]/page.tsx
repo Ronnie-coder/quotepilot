@@ -18,7 +18,7 @@ export default async function QuotePage({ params, searchParams }: QuotePageProps
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/sign-in');
 
-  // Fetch Quote
+  // Fetch Quote with clients relationship
   const { data: quote, error } = await supabase
     .from('quotes')
     .select(`
@@ -28,13 +28,14 @@ export default async function QuotePage({ params, searchParams }: QuotePageProps
     .eq('id', quoteId)
     .single();
 
+  // 🟢 FIX: Redirect to correct invoices path if not found
   if (error || !quote) {
-    redirect('/dashboard/quotes');
+    redirect('/dashboard/invoices');
   }
 
   // Security Check
   if (quote.user_id !== user.id) {
-    redirect('/dashboard');
+    redirect('/dashboard/invoices');
   }
 
   // Fetch Metadata

@@ -1,10 +1,29 @@
-// next.config.mjs
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // We will add specific configurations here only as needed.
-  // The 'serverActions' warning is resolved by removing the key,
-  // as it is on by default in Next.js 15+.
+  async redirects() {
+    return [
+      // Canonicalize Dashboard List
+      {
+        source: '/dashboard/quotes',
+        destination: '/dashboard/invoices',
+        permanent: true,
+      },
+      // Canonicalize New Invoice Wizard
+      {
+        source: '/quote/new',
+        destination: '/dashboard/invoices/new',
+        permanent: true,
+      },
+      // Canonicalize Edit/View Invoice
+      // We catch /quote/:id but exclude 'new' via order or specificity if needed,
+      // but strictly 'new' is caught above.
+      {
+        source: '/quote/:id',
+        destination: '/dashboard/invoices/:id',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

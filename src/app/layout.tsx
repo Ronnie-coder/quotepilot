@@ -14,12 +14,12 @@ const inter = Inter({ subsets: ['latin'] });
 const siteUrl = 'https://quotepilot.coderon.co.za/';
 
 export const metadata: Metadata = {
-  title: 'QuotePilot - Professional Invoices & Quotes for Africa',
-  description: 'The premier invoice and quote generator for freelancers and SMEs in Africa. Fast, beautiful, and built to empower your growth.',
+  title: 'QuotePilot - Professional Invoicing for Africa',
+  description: 'The premier invoice generator for freelancers and SMEs in Africa. Fast, beautiful, and built to empower your growth.',
   metadataBase: new URL(siteUrl),
   openGraph: {
-    title: 'QuotePilot - Professional Invoices & Quotes for Africa',
-    description: 'The premier invoice and quote generator for freelancers and SMEs in Africa.',
+    title: 'QuotePilot - Professional Invoicing for Africa',
+    description: 'The premier invoice generator for freelancers and SMEs in Africa.',
     url: siteUrl,
     siteName: 'QuotePilot',
     images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'QuotePilot Application Interface' }],
@@ -28,8 +28,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'QuotePilot - Professional Invoices & Quotes for Africa',
-    description: 'The premier invoice and quote generator for freelancers and SMEs in Africa.',
+    title: 'QuotePilot - Professional Invoicing for Africa',
+    description: 'The premier invoice generator for freelancers and SMEs in Africa.',
     images: ['/og-image.png'],
   },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true } },

@@ -1,10 +1,10 @@
-import { InvoiceForm } from '@/components/InvoiceForm';
+// 🟢 FIX: Changed to default import (no curly braces)
+import InvoiceForm from '@/components/InvoiceForm';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Box, Heading, Text, VStack } from '@chakra-ui/react';
 
 export default async function NewQuotePage() {
-  // 🟢 FIX: Added await here
   const supabase = await createSupabaseServerClient();
 
   const { data: { user } } = await supabase.auth.getUser();

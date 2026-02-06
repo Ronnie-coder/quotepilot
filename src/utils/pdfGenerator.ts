@@ -145,8 +145,6 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   doc.setFontSize(9);
   
   if (data.from.address) {
-     // Split address for right alignment is tricky in jsPDF, simpler to just list it or rely on single lines
-     // For robustness, we assume single line or short address here, or user manually breaks lines in profile settings
      const addressLines = doc.splitTextToSize(data.from.address, 60);
      doc.text(addressLines, pageWidth - margin, infoY, { align: 'right' });
      infoY += (addressLines.length * 4);
@@ -165,11 +163,8 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   yPos = Math.max(infoY, yPos + 45) + 10; 
 
   // --- 2. ADDRESSES (CLIENT "BILL TO") ---
-  // Since Company Info is now in Header, we only need "Bill To" on the Left
-  
   const startAddressY = yPos;
   
-  // BILL TO (Left Side)
   doc.setFontSize(8);
   doc.setTextColor(COLOR_PRIMARY);
   doc.setFont('helvetica', 'bold');
@@ -229,7 +224,6 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   const leftColX = margin;
   const rightColX = pageWidth - margin; 
   
-  // -- LEFT COLUMN: Notes, Bank, SIGNATURE --
   let leftY = finalY;
 
   // NOTES / TERMS
@@ -239,13 +233,12 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
     doc.setFont('helvetica', 'bold');
     doc.text(termsLabel, leftColX, leftY);
     doc.setFont('helvetica', 'normal');
-    // Using slightly narrower width for notes to separate from totals
     const noteLines = doc.splitTextToSize(data.notes, 90); 
     doc.text(noteLines, leftColX, leftY + 5);
     leftY += 10 + (noteLines.length * 4);
   }
 
-  // BANK DETAILS (INVOICE ONLY)
+  // BANK DETAILS
   if (!isQuote && data.payment && (data.payment.bankName || data.payment.accNumber)) {
     leftY += 5;
     doc.setFontSize(8);
@@ -294,7 +287,7 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   // -- RIGHT COLUMN: Financials --
   let rightY = finalY;
 
-  // 1. Subtotal
+  // Subtotal
   const subtotalStr = formatCurrency(data.subtotal, CURRENCY);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -304,7 +297,7 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
   doc.setTextColor(COLOR_TEXT_MUTED);
   doc.text('Subtotal:', rightColX - subWidth - 5, rightY, { align: 'right' });
 
-  // 2. VAT
+  // VAT
   if (data.vatRate && data.vatRate > 0) {
     rightY += 6;
     const vatStr = formatCurrency(data.vatAmount, CURRENCY);
@@ -315,17 +308,14 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
     doc.text(`VAT (${data.vatRate}%):`, rightColX - vatWidth - 5, rightY, { align: 'right' });
   }
 
-  // 3. Total
+  // Total
   rightY += 10;
   const totalStr = formatCurrency(data.total, CURRENCY);
-  
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   const totalWidth = doc.getTextWidth(totalStr);
-  
   doc.setTextColor(isQuote ? '#805AD5' : COLOR_PRIMARY);
   doc.text(totalStr, rightColX, rightY, { align: 'right' });
-
   doc.setFontSize(12);
   doc.setTextColor(COLOR_TEXT_MAIN);
   doc.text(totalLabel, rightColX - totalWidth - 6, rightY, { align: 'right' });
@@ -338,7 +328,7 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
      doc.text(`${dueLabel} ${formatDate(data.dueDate)}`, rightColX, rightY, { align: 'right' });
   }
 
-  // QR CODE & PAYMENT LINK (INVOICE ONLY)
+  // QR CODE & PAYMENT LINK
   if (!isQuote && data.paymentLink) {
     const btnY = rightY + 10;
     const btnWidth = 40;
@@ -349,7 +339,6 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
     if(qrData) {
         const qrSize = 15; 
         const qrX = btnX - qrSize - 5; 
-        
         doc.addImage(qrData, 'PNG', qrX, btnY - 2, qrSize, qrSize);
         doc.setFontSize(6);
         doc.setTextColor(COLOR_TEXT_MUTED);
@@ -378,10 +367,19 @@ export const generatePdf = async (data: InvoicePdfPayload): Promise<Blob> => {
       } catch(e) {}
   }
 
+  // 🟢 NEW FOOTER TEXT WITH ONLINE PAYMENT MENTION
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(COLOR_TEXT_MUTED);
-  doc.text("Sent with QuotePilot — Get paid faster", pageWidth - margin, footerY, { align: 'right' });
+  
+  // Left side info
+  if(!isQuote) {
+     // 🟢 COPY UPDATE: PDF Footer
+     doc.text("Secure online payment available via digital invoice link.", margin + 25, footerY, { align: 'left' });
+  }
+
+  // Right side branding
+  doc.text("Sent with QuotePilot", pageWidth - margin, footerY, { align: 'right' });
 
   return doc.output('blob');
 };

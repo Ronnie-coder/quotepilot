@@ -74,6 +74,7 @@ function StatCard({ icon, label, value, accentColor, isCurrency = false }: any) 
   const textColor = useColorModeValue('gray.500', 'gray.400');
   const valueColor = useColorModeValue('gray.800', 'white');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const iconBg = useColorModeValue('gray.50', 'whiteAlpha.100');
 
   return (
     <Box
@@ -85,7 +86,7 @@ function StatCard({ icon, label, value, accentColor, isCurrency = false }: any) 
       <HStack spacing={4}>
         <Flex
           w={12} h={12} align={'center'} justify={'center'} rounded={'full'}
-          bg={useColorModeValue('gray.50', 'whiteAlpha.100')}
+          bg={iconBg}
           _groupHover={{ bg: accentColor, color: 'white' }}
           transition="all 0.2s" color={accentColor}
         >
@@ -109,6 +110,8 @@ function ActionRequiredCard({ overdueInvoices, defaultCurrency }: { overdueInvoi
   const warningColor = useColorModeValue('orange.500', 'orange.300');
   const bg = useColorModeValue('orange.50', 'rgba(237, 137, 54, 0.1)');
   const borderColor = useColorModeValue('orange.200', 'orange.900');
+  const hoverBg = useColorModeValue('orange.100', 'whiteAlpha.100');
+  
   const [showAll, setShowAll] = useState(false);
   const displayedInvoices = showAll ? overdueInvoices : overdueInvoices.slice(0, 3);
   const hiddenCount = overdueInvoices.length - 3;
@@ -134,7 +137,7 @@ function ActionRequiredCard({ overdueInvoices, defaultCurrency }: { overdueInvoi
         </Box>
         <VStack spacing={0} align="stretch" borderTopWidth="1px" borderColor={borderColor}>
           {displayedInvoices.map((invoice, index) => (
-            <ChakraLink as={NextLink} href={`/quote/${invoice.id}`} key={invoice.id} _hover={{ textDecoration: 'none', bg: useColorModeValue('orange.100', 'whiteAlpha.200') }} p={4} px={6} w="full" borderBottomWidth={index === displayedInvoices.length - 1 && !hasHiddenItems ? '0px' : '1px'} borderColor={borderColor} transition="background-color 0.2s">
+            <ChakraLink as={NextLink} href={`/dashboard/invoices/${invoice.id}`} key={invoice.id} _hover={{ textDecoration: 'none', bg: hoverBg }} p={4} px={6} w="full" borderBottomWidth={index === displayedInvoices.length - 1 && !hasHiddenItems ? '0px' : '1px'} borderColor={borderColor} transition="background-color 0.2s">
               <Flex w="full" justify="space-between" align="center">
                 <VStack align="start" spacing={0}>
                   <Text fontWeight="bold" color={headingColor} fontSize="sm">#{invoice.invoice_number || 'N/A'} — {invoice?.clients?.name}</Text>
@@ -145,7 +148,7 @@ function ActionRequiredCard({ overdueInvoices, defaultCurrency }: { overdueInvoi
             </ChakraLink>
           ))}
         </VStack>
-        {hasHiddenItems && (<Button onClick={() => setShowAll(!showAll)} variant="ghost" colorScheme="orange" size="sm" width="full" rounded="none" py={6} rightIcon={<Icon as={showAll ? ChevronUp : ChevronDown} />} _hover={{ bg: useColorModeValue('orange.100', 'whiteAlpha.200') }}>{showAll ? 'Show Less' : `View ${hiddenCount} More Overdue Invoices`}</Button>)}
+        {hasHiddenItems && (<Button onClick={() => setShowAll(!showAll)} variant="ghost" colorScheme="orange" size="sm" width="full" rounded="none" py={6} rightIcon={<Icon as={showAll ? ChevronUp : ChevronDown} />} _hover={{ bg: hoverBg }}>{showAll ? 'Show Less' : `View ${hiddenCount} More Overdue Invoices`}</Button>)}
       </Alert>
     </Box>
   );
@@ -164,9 +167,10 @@ export default function DashboardClientPage({
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const primaryColor = useColorModeValue('brand.500', 'brand.300');
   
-  const tooltipBg = useColorModeValue('#ffffff', '#2D3748');
-  const tooltipBorder = useColorModeValue('#E2E8F0', '#4A5568');
+  const tooltipBg = useColorModeValue('#ffffff', '#1A202C');
+  const tooltipBorder = useColorModeValue('#E2E8F0', '#2D3748');
   const tooltipText = useColorModeValue('#1A202C', '#F7FAFC');
+  
   const [brand500] = useToken('colors', ['brand.500']);
   const [green400, orange400, gray300, blue400] = useToken('colors', ['green.400', 'orange.400', 'gray.300', 'blue.400']);
 
@@ -212,7 +216,7 @@ export default function DashboardClientPage({
               Quick Actions
             </MenuButton>
             <MenuList shadow="xl" borderColor={borderColor}>
-              <MenuItem as={NextLink} href="/quote/new" icon={<Icon as={Plus} boxSize={4} />}>New Document</MenuItem>
+              <MenuItem as={NextLink} href="/dashboard/invoices/new" icon={<Icon as={Plus} boxSize={4} />}>New Document</MenuItem>
               <MenuItem onClick={onOpen} icon={<Icon as={UserPlus} boxSize={4} />}>Add New Client</MenuItem>
             </MenuList>
           </Menu>
@@ -247,6 +251,7 @@ export default function DashboardClientPage({
             <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={8} as={motion.div} variants={itemVariants}>
               
               {/* Revenue Chart */}
+              {/* 🟢 FIX: Added minWidth=0 to prevent Recharts -1 width error */}
               <Box gridColumn={{ lg: 'span 2' }} bg={cardBg} p={6} borderRadius="xl" borderWidth="1px" borderColor={borderColor} shadow="sm" position="relative" minWidth={0}>
                 <Flex justify="space-between" align="center" mb={6}>
                     <HStack>
@@ -255,7 +260,6 @@ export default function DashboardClientPage({
                     </HStack>
                     <Badge colorScheme="brand" variant="subtle">Last 6 Months</Badge>
                 </Flex>
-                {/* 🟢 FIX: Enforce fixed height wrapper */}
                 <Box h="300px" w="100%">
                   {revenueData && revenueData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -286,9 +290,9 @@ export default function DashboardClientPage({
               </Box>
 
               {/* Pie Chart */}
+              {/* 🟢 FIX: Added minWidth=0 to prevent Recharts -1 width error */}
               <Flex direction="column" bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={borderColor} shadow="sm" p={6} h="full" minH="400px" minWidth={0}>
                 <HStack mb={4}><Icon as={PieChartIcon} color="orange.400" boxSize={5} /><Heading size="md" color={headingColor}>Invoice Health</Heading></HStack>
-                {/* 🟢 FIX: Enforce fixed height wrapper */}
                 <Box h="300px" w="100%" position="relative">
                   {totalInvoices > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -315,7 +319,7 @@ export default function DashboardClientPage({
             <Box as={motion.div} variants={itemVariants} bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={borderColor} shadow="sm" overflow="hidden">
                 <Flex p={6} pb={4} justify="space-between" align="center">
                   <Heading size="md" color={headingColor}>Recent Activity</Heading>
-                  <ChakraLink as={NextLink} href="/dashboard/quotes" color={primaryColor} fontSize="sm" fontWeight="semibold" _hover={{ textDecoration: 'underline' }}>View All</ChakraLink>
+                  <ChakraLink as={NextLink} href="/dashboard/invoices" color={primaryColor} fontSize="sm" fontWeight="semibold" _hover={{ textDecoration: 'underline' }}>View All</ChakraLink>
                 </Flex>
                 <Divider color={borderColor} />
                 <VStack spacing={0} align="stretch">
@@ -326,11 +330,11 @@ export default function DashboardClientPage({
                       const showMoneyIcon = isInvoice && isPaid;
 
                       const IconComp = showMoneyIcon ? DollarSign : FileText;
-                      const iconBgColor = showMoneyIcon ? 'green.100' : 'gray.100';
-                      const iconColor = showMoneyIcon ? 'green.600' : 'gray.600';
+                      const iconBgColor = showMoneyIcon ? 'green.100' : useColorModeValue('gray.100', 'whiteAlpha.100');
+                      const iconColor = showMoneyIcon ? 'green.600' : useColorModeValue('gray.600', 'white');
 
                       return (
-                        <ChakraLink as={NextLink} href={`/quote/${doc.id}`} key={doc.id} _hover={{ textDecoration: 'none', bg: linkHoverBg }} p={4} borderBottomWidth={index === recentDocuments.length - 1 ? '0px' : '1px'} borderColor={borderColor} transition="all 0.2s">
+                        <ChakraLink as={NextLink} href={`/dashboard/invoices/${doc.id}`} key={doc.id} _hover={{ textDecoration: 'none', bg: linkHoverBg }} p={4} borderBottomWidth={index === recentDocuments.length - 1 ? '0px' : '1px'} borderColor={borderColor} transition="all 0.2s">
                           <HStack justify="space-between">
                             <HStack spacing={3}>
                               <Box p={2} borderRadius="md" bg={iconBgColor} color={iconColor}>

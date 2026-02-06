@@ -17,7 +17,7 @@ import NextLink from 'next/link';
 import Image from 'next/image';
 
 const FooterLink = ({ href, children, isExternal = false }: { href: string; children: React.ReactNode; isExternal?: boolean }) => {
-  const textColor = useColorModeValue('gray.500', 'gray.400');
+  const textColor = useColorModeValue('gray.600', 'gray.400'); // Darkened for AA contrast
   const hoverColor = useColorModeValue('gray.900', 'white'); 
   
   return (
@@ -29,7 +29,7 @@ const FooterLink = ({ href, children, isExternal = false }: { href: string; chil
       fontSize="sm"
       _hover={{ 
         color: hoverColor, 
-        textDecoration: 'none'
+        textDecoration: 'underline' // Added underline on hover for accessibility
       }}
       transition="color 0.2s"
     >
@@ -39,7 +39,7 @@ const FooterLink = ({ href, children, isExternal = false }: { href: string; chil
 };
 
 const Footer = () => {
-  const textColor = useColorModeValue('gray.500', 'gray.400');
+  const textColor = useColorModeValue('gray.600', 'gray.400');
   const headingColor = useColorModeValue('gray.900', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.800');
   const bgColor = useColorModeValue('gray.50', 'gray.900');
@@ -67,9 +67,9 @@ const Footer = () => {
               </Heading>
             </HStack>
             <Text fontSize="sm" color={textColor} lineHeight="relaxed" maxW="xs">
-              Professional proposals and invoices for freelancers.
+              Professional invoicing for African freelancers and SMEs.
             </Text>
-            <Text fontSize="xs" color="gray.400" pt={2}>
+            <Text fontSize="xs" color="gray.500" pt={2}>
               Made in South Africa 🇿🇦
             </Text>
           </VStack>

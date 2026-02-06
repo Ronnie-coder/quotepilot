@@ -62,10 +62,11 @@ export const InvoiceEmail = ({
     bodyText = `This is a friendly reminder that invoice ${invoiceNumber} for ${amount} was due on ${dueDate}.`;
     closingText = "If you’ve already made payment, thank you — please ignore this message.";
   } else {
-    // TEMPLATE C: NEW INVOICE
+    // 🟢 TEMPLATE C: NEW INVOICE (UPDATED)
     previewText = `Invoice #${invoiceNumber} from ${senderName}`;
     headingText = `Invoice #${invoiceNumber}`;
-    bodyText = `${senderName} has sent you an invoice for ${amount}.`;
+    // 🟢 FIXED: Exact wording "via online payment or Crypto"
+    bodyText = `${senderName} has sent you an invoice for ${amount}. You can pay securely online via online payment or Crypto using the verified link below.`;
     closingText = "If you have any questions, please let us know.";
   }
 

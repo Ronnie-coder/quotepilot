@@ -44,8 +44,9 @@ export default function SignInPage() {
 
   // Theme Variables
   const boxBg = useColorModeValue('white', 'gray.900');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const borderColor = useColorModeValue('gray.300', 'gray.600'); // Improved contrast
   const tealColor = useColorModeValue('teal.600', 'teal.400');
+  const labelColor = useColorModeValue('gray.700', 'gray.300');
 
   // LOGO VISIBILITY LOGIC
   const logoFilter = useColorModeValue(
@@ -85,7 +86,7 @@ export default function SignInPage() {
       <Box 
         rounded="2xl" 
         bg={boxBg} 
-        boxShadow="2xl" 
+        boxShadow="xl" 
         p={{ base: 6, md: 8 }} 
         border="1px" 
         borderColor={borderColor}
@@ -98,7 +99,7 @@ export default function SignInPage() {
           <Box filter={logoFilter} transition="all 0.3s">
              <Image src="/logo.svg" alt="QuotePilot" width={48} height={48} priority />
           </Box>
-          <Heading fontSize="xl" textAlign="center" fontWeight="bold" color={useColorModeValue('gray.700', 'white')}>
+          <Heading as="h1" fontSize="xl" textAlign="center" fontWeight="bold" color={useColorModeValue('gray.800', 'white')}>
             Sign in to QuotePilot
           </Heading>
         </VStack>
@@ -113,6 +114,7 @@ export default function SignInPage() {
             leftIcon={<Icon as={FaGoogle} />} 
             onClick={() => handleOAuthSignIn('google')}
             fontSize="sm"
+            aria-label="Sign in with Google"
           >
             Google
           </Button>
@@ -122,6 +124,7 @@ export default function SignInPage() {
             leftIcon={<Icon as={FaGithub} />} 
             onClick={() => handleOAuthSignIn('github')}
             fontSize="sm"
+            aria-label="Sign in with GitHub"
           >
             GitHub
           </Button>
@@ -131,6 +134,7 @@ export default function SignInPage() {
             leftIcon={<Icon as={FaLinkedin} color="#0077b5" />} 
             onClick={() => handleOAuthSignIn('linkedin_oidc')}
             fontSize="sm"
+            aria-label="Sign in with LinkedIn"
           >
             LinkedIn
           </Button>
@@ -140,10 +144,10 @@ export default function SignInPage() {
             leftIcon={<Icon as={FaTwitter} />} 
             onClick={() => handleOAuthSignIn('twitter')}
             fontSize="sm"
+            aria-label="Sign in with X (Twitter)"
           >
             X (Twitter)
           </Button>
-          {/* Notion Spans 2 Columns */}
           <Button 
             variant="outline" 
             borderColor={borderColor} 
@@ -152,6 +156,7 @@ export default function SignInPage() {
             fontSize="sm"
             gridColumn="span 2"
             _hover={{ bg: useColorModeValue('gray.50', 'whiteAlpha.100') }}
+            aria-label="Sign in with Notion"
           >
             Continue with Notion
           </Button>
@@ -168,19 +173,20 @@ export default function SignInPage() {
         <form onSubmit={handleSignIn}>
           <Stack spacing={4}>
             <FormControl id="email" isRequired>
-              <FormLabel fontSize="sm">Email address</FormLabel>
+              <FormLabel fontSize="sm" color={labelColor}>Email address</FormLabel>
               <Input 
                 type="email" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
                 placeholder="you@company.com" 
                 borderColor={borderColor}
-                focusBorderColor="teal.400"
+                focusBorderColor="teal.500"
+                _hover={{ borderColor: 'teal.300' }}
               />
             </FormControl>
             
             <FormControl id="password" isRequired>
-              <FormLabel fontSize="sm">Password</FormLabel>
+              <FormLabel fontSize="sm" color={labelColor}>Password</FormLabel>
               <InputGroup size="md">
                 <Input 
                   type={showPassword ? 'text' : 'password'} 
@@ -188,10 +194,11 @@ export default function SignInPage() {
                   onChange={(e) => setPassword(e.target.value)} 
                   placeholder="••••••••" 
                   borderColor={borderColor}
-                  focusBorderColor="teal.400"
+                  focusBorderColor="teal.500"
+                  _hover={{ borderColor: 'teal.300' }}
                 />
                 <InputRightElement width="3rem">
-                  <Button h="1.75rem" size="sm" onClick={() => setShowPassword(!showPassword)} variant="ghost">
+                  <Button h="1.75rem" size="sm" onClick={() => setShowPassword(!showPassword)} variant="ghost" aria-label={showPassword ? "Hide password" : "Show password"}>
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </Button>
                 </InputRightElement>
@@ -208,7 +215,7 @@ export default function SignInPage() {
           </Stack>
         </form>
         
-        <Text mt={6} textAlign="center" fontSize="sm" color="gray.500">
+        <Text mt={6} textAlign="center" fontSize="sm" color="gray.600">
           New to QuotePilot? <Link as={NextLink} href="/sign-up" color={tealColor} fontWeight="bold">Sign Up</Link>
         </Text>
       </Box>
