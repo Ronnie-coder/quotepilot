@@ -14,12 +14,22 @@ const inter = Inter({ subsets: ['latin'] });
 const siteUrl = 'https://quotepilot.coderon.co.za/';
 
 export const metadata: Metadata = {
-  title: 'QuotePilot - Professional Invoicing for Africa',
-  description: 'The premier invoice generator for freelancers and SMEs in Africa. Fast, beautiful, and built to empower your growth.',
+  title: 'QuotePilot – Professional Invoicing for African Freelancers & SMEs',
+  description: 'Send professional invoices via WhatsApp and get paid faster. QuotePilot helps African freelancers and SMEs create verified invoices and accept online or crypto payments.',
+  keywords: [
+    'invoicing software Africa',
+    'WhatsApp invoicing',
+    'freelancer invoicing',
+    'SME invoicing',
+    'invoice payments Africa',
+    'crypto invoicing',
+    'USDT payments',
+    'online invoicing tool',
+  ],
   metadataBase: new URL(siteUrl),
   openGraph: {
-    title: 'QuotePilot - Professional Invoicing for Africa',
-    description: 'The premier invoice generator for freelancers and SMEs in Africa.',
+    title: 'QuotePilot – WhatsApp‑First Invoicing for Africa',
+    description: 'Create professional invoices, share them instantly via WhatsApp, and get paid faster with online or crypto payments.',
     url: siteUrl,
     siteName: 'QuotePilot',
     images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'QuotePilot Application Interface' }],
@@ -28,8 +38,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'QuotePilot - Professional Invoicing for Africa',
-    description: 'The premier invoice generator for freelancers and SMEs in Africa.',
+    title: 'QuotePilot – WhatsApp‑First Invoicing for Africa',
+    description: 'Create professional invoices, share them instantly via WhatsApp, and get paid faster with online or crypto payments.',
     images: ['/og-image.png'],
   },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
