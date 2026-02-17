@@ -202,7 +202,7 @@ export default function PublicView({ quote, userEmail }: PublicViewProps) {
       <Flex justify="space-between" align="center" mb={6} gap={4} wrap="wrap">
          <Flex gap={2} align="center">
             {isVerified && (
-                <Tooltip label="This invoice is cryptographically verified and cannot be altered." fontSize="sm" hasArrow bg="green.700" color="white" p={3} rounded="md">
+                <Tooltip label="This invoice is cryptographically verified and securely recorded." fontSize="sm" hasArrow bg="green.700" color="white" p={3} rounded="md">
                     <Badge colorScheme="green" variant="solid" fontSize="xs" px={3} py={1.5} borderRadius="full" display="flex" alignItems="center" gap={2} shadow="sm" cursor="help">
                         <Icon as={ShieldCheck} boxSize={3.5} /> 
                         Verified Invoice
