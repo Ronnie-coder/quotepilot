@@ -22,8 +22,10 @@ export async function middleware(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = req.nextUrl;
 
-  const publicPaths = ['/', '/sign-in', '/sign-up', '/forgot-password', '/update-password', '/callback'];
-  const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
+  // Pages anyone may open. '/' must match exactly: every path starts with '/', so a prefix
+  // match on it made the whole app public.
+  const publicPrefixes = ['/sign-in', '/sign-up', '/forgot-password', '/update-password', '/auth/callback', '/p/', '/privacy-policy', '/terms-of-service', '/api/support'];
+  const isPublicPath = pathname === '/' || publicPrefixes.some(path => pathname === path || pathname.startsWith(`${path}/`) || (path.endsWith('/') && pathname.startsWith(path)));
 
   // RULE A: Protect Private Routes
   if (!user && !isPublicPath) {
@@ -60,6 +62,6 @@ export async function middleware(req: NextRequest) {
 export const config = {
   // 🟢 OPTIMIZED MATCHER: Excludes static files, images, icons to reduce noise
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|json|webmanifest)$).*)',
   ],
 };

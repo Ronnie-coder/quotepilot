@@ -1,4 +1,9 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+
+// Shared invoice links work for anyone who has the link (the id is a random UUID), so the
+// invoice is read on the server by id. The database itself does not need to allow public
+// reads, and nobody can list other people's invoices.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { notFound } from "next/navigation";
 import PublicView from "./PublicView";
 import { Metadata } from 'next';
@@ -8,9 +13,10 @@ type PageProps = {
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const supabase = await createSupabaseServerClient();
   const { id } = await params;
-  
+  if (!UUID.test(id)) return { title: 'QuotePilot Document' };
+  const supabase = createSupabaseAdminClient();
+
   // 1. Fetch minimal data for metadata
   const { data: quote } = await supabase
     .from('quotes')
@@ -70,8 +76,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function PublicQuotePage({ params }: PageProps) {
-  const supabase = await createSupabaseServerClient();
   const { id } = await params;
+  if (!UUID.test(id)) return notFound();
+  const supabase = createSupabaseAdminClient();
 
   // 1. Fetch Quote & Relations
   const { data: rawQuote, error } = await supabase

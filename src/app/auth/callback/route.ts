@@ -9,7 +9,8 @@ export async function GET(request: Request) {
   let next = searchParams.get('next') ?? '/dashboard';
 
   // Security Check: Ensure redirect is relative
-  if (!next.startsWith('/')) {
+  // Only same-site paths: '//host' and '/\\host' would send people to another site.
+  if (!next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) {
     next = '/dashboard';
   }
 
@@ -21,19 +22,7 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
-      const forwardedHost = request.headers.get('x-forwarded-host'); // Original origin before load balancer
-      const isLocalEnv = process.env.NODE_ENV === 'development';
-      
-      if (isLocalEnv) {
-        // Localhost: Direct redirect
-        return NextResponse.redirect(`${origin}${next}`);
-      } else if (forwardedHost) {
-        // Production/Vercel: Use the forwarded host to prevent mismatch errors
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
-      } else {
-        // Fallback
-        return NextResponse.redirect(`${origin}${next}`);
-      }
+      return NextResponse.redirect(`${origin}${next}`);
     } else {
         console.error('Auth Code Exchange Error:', error);
     }

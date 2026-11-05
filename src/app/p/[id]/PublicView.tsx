@@ -9,7 +9,7 @@ import { generatePdf } from "@/utils/pdfGenerator";
 import { mapToPdfPayload } from "@/utils/pdfMapper"; 
 import { CreditCard, ShieldCheck, CheckCircle2, Wallet, Lock, ExternalLink, Globe, AlertTriangle } from "lucide-react"; 
 import QRCode from "qrcode"; 
-import { markInvoicePaidAction } from "@/app/dashboard/invoices/actions";
+import { confirmCryptoPaymentAction } from "@/app/actions/confirmCryptoPayment";
 
 // --- WEB3 CONSTANTS (Polygon Mainnet) ---
 const POLYGON_CHAIN_ID_HEX = '0x89'; // 137
@@ -174,14 +174,33 @@ export default function PublicView({ quote, userEmail }: PublicViewProps) {
             duration: 10000
         });
 
-        await markInvoicePaidAction(quote.id, txHash, 'USDT');
-        
-        toast({ 
-          title: "Payment Confirmed", 
-          description: "Invoice marked as paid on the blockchain.", 
-          status: "success",
-          duration: 5000 
-        });
+        // The server checks the transaction on Polygon before marking the invoice paid.
+        // Poll for up to ~2 minutes while the transaction is mined.
+        let result = await confirmCryptoPaymentAction(quote.id, txHash);
+        for (let i = 0; i < 24 && result.status === "pending"; i++) {
+          await new Promise((r) => setTimeout(r, 5000));
+          result = await confirmCryptoPaymentAction(quote.id, txHash);
+        }
+
+        if (result.status === "paid") {
+          toast({
+            title: "Payment confirmed",
+            description: "The transfer was confirmed on Polygon and the invoice is marked paid.",
+            status: "success",
+            duration: 6000,
+          });
+          window.location.reload();
+        } else if (result.status === "pending") {
+          toast({
+            title: "Payment sent, still confirming",
+            description: `The network hasn't confirmed it yet. Keep this reference: ${txHash}`,
+            status: "warning",
+            duration: null,
+            isClosable: true,
+          });
+        } else {
+          toast({ title: "Payment not confirmed", description: result.message, status: "error", duration: null, isClosable: true });
+        }
         
     } catch (error: any) {
         console.error(error);
