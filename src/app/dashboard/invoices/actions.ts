@@ -166,25 +166,7 @@ export const deleteQuoteAction = async (quoteId: string) => {
     return { success: 'Document purged successfully.' };
 };
 
-// --- 4. MARK AS PAID (CRYPTO) ---
-export const markInvoicePaidAction = async (invoiceId: string, txHash: string, method: 'USDT' | 'Bank' = 'USDT') => {
-  const supabase = await createSupabaseServerClient();
-  
-  const { error } = await supabase
-    .from('quotes')
-    .update({ 
-      status: 'Paid', 
-      payment_tx_hash: txHash,
-      payment_method: method 
-    })
-    .eq('id', invoiceId);
-
-  if (error) throw new Error(`Failed to mark paid: ${error.message}`);
-  
-  revalidatePath(`/p/${invoiceId}`); 
-  revalidatePath('/dashboard/invoices');
-  return { success: true };
-};
+// --- 4. CRYPTO PAYMENTS: see src/app/actions/confirmCryptoPayment.ts (verified on-chain) ---
 
 // --- 5. UPDATE STATUS ACTION (List View Dropdown) ---
 export async function updateDocumentStatusAction(documentId: string, newStatus: string) {
@@ -253,7 +235,7 @@ export async function getQuoteForPdf(quoteId: string) {
 
   if (!user) throw new Error('Unauthorized');
 
-  const { data: quote, error: quoteError } = await supabase.from('quotes').select(`*, clients ( * )`).eq('id', quoteId).single();
+  const { data: quote, error: quoteError } = await supabase.from('quotes').select(`*, clients ( * )`).eq('id', quoteId).eq('user_id', user.id).single();
   if (quoteError || !quote) return { error: 'Document not found' };
 
   const { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single();

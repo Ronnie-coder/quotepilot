@@ -1,11 +1,10 @@
 "use server";
 
 import { Resend } from "resend";
-import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { generatePdf } from "@/utils/pdfGenerator";
 import { mapToPdfPayload } from "@/utils/pdfMapper";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper type for JSON column
 interface PaymentSettings {
@@ -20,6 +19,13 @@ export async function sendInvoiceEmail(quoteId: string, forceReminder: boolean =
     return { success: false, message: "Server configuration error: Missing API Key." };
   }
 
+  // Server actions can be called directly by anyone, so check who is asking: only the
+  // signed-in owner of this invoice may email it.
+  const sessionClient = await createSupabaseServerClient();
+  const { data: { user } } = await sessionClient.auth.getUser();
+  if (!user) return { success: false, message: "Please sign in again." };
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const supabase = createSupabaseAdminClient();
 
   // 1. Fetch Quote Data with COMPLETE Relations
@@ -33,8 +39,8 @@ export async function sendInvoiceEmail(quoteId: string, forceReminder: boolean =
     .eq("id", quoteId)
     .single();
 
-  if (dbError || !quote) {
-    console.error("❌ DB Error:", dbError); 
+  if (dbError || !quote || quote.user_id !== user.id) {
+    if (dbError) console.error("❌ DB Error:", dbError);
     return { success: false, message: "Quote data not found." };
   }
 
